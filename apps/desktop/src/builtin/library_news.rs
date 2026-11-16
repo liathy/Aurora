@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use store::events::{EventKind, GameEvent};
 use ui::{Theme, icons, widgets as w};
 
-pub type EventsSlot = Arc<Mutex<Option<Vec<GameEvent>>>>;
+pub type EventsSlot = Arc<Mutex<Option<Arc<Vec<GameEvent>>>>>;
 /// People playing a game right now, once Steam has answered.
 pub type PlayersSlot = Arc<Mutex<Option<u32>>>;
 
@@ -33,7 +33,12 @@ pub fn date(unix: u64) -> String {
 }
 
 impl Library {
-    pub(super) fn events(&mut self, id: AppId) -> Option<Vec<GameEvent>> {
+    /// A game's news (shared, not copied: the page asks every frame).
+    pub(super) fn events(&mut self, id: AppId) -> Option<Arc<Vec<GameEvent>>> {
+        if let Some(old) = self.recent.touch(id) {
+            self.events.remove(&old);
+            self.players.remove(&old);
+        }
         if !self.events.contains_key(&id) {
             let slot: EventsSlot = Arc::new(Mutex::new(None));
             if let (Some(rt), Some(ctx)) = (&self.rt, &self.egui) {
@@ -44,7 +49,7 @@ impl Library {
                         tracing::warn!("events for {id}: {e}");
                         Vec::new()
                     });
-                    *out.lock().unwrap() = Some(items);
+                    *out.lock().unwrap() = Some(Arc::new(items));
                     ctx.request_repaint();
                 });
             }

@@ -81,15 +81,12 @@ impl StoreClient {
             "russian" => "8_0",
             _ => "0",
         };
-        let resp: serde_json::Value = self
+        // Saved for an hour: news doesn't change that often.
+        let req = self
             .http
             .get("https://store.steampowered.com/events/ajaxgetadjacentpartnerevents/")
-            .query(&[("appid", app.to_string()), ("count_before", "0".into()), ("count_after", count.to_string()), ("lang_list", lang.into())])
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
+            .query(&[("appid", app.to_string()), ("count_before", "0".into()), ("count_after", count.to_string()), ("lang_list", lang.into())]);
+        let resp: serde_json::Value = self.cached_json(req, std::time::Duration::from_secs(60 * 60)).await?;
         // One post at a time, so a single odd one can't empty the feed.
         let events = resp.get("events").and_then(|e| e.as_array()).cloned().unwrap_or_default();
         Ok(events

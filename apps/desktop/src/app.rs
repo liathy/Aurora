@@ -195,6 +195,8 @@ impl SteamApp {
         // Pictures come from the disk cache when possible (added after the
         // standard loaders, so it's asked first).
         crate::image_cache::ImageCache::install(&cc.egui_ctx, rt.handle().clone());
+        // Store pages and game news, saved next to the pictures.
+        store::disk::init(crate::image_cache::dir().with_file_name("pages"));
         let (tx, events) = mpsc::channel();
         let demo_tx = tx.clone();
         let repaint = cc.egui_ctx.clone();
@@ -501,6 +503,7 @@ impl SteamApp {
     /// raises it again with an activation token. Without a tray icon nothing
     /// could bring a hidden window back, so it only minimizes too.
     fn hide_to_tray(&mut self, ctx: &egui::Context) {
+        crate::release_memory();
         if self.tray.available() && !self.tray.wayland() {
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
             self.hidden = true;

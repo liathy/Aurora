@@ -234,6 +234,8 @@ pub struct Library {
     reports: HashMap<AppId, VerifyReport>,
     pending: Option<String>,
     events: HashMap<AppId, news::EventsSlot>,
+    /// Games whose news and player counts are kept (above the 10 "What's new" reads).
+    recent: super::RecentApps,
     /// People playing each game right now: (last asked, count).
     players: HashMap<AppId, (std::time::Instant, news::PlayersSlot)>,
     reader: Option<Reader>,
@@ -588,7 +590,7 @@ impl Library {
         let mut loading = false;
         for (id, _, _) in recent.iter().take(10) {
             match self.events(*id) {
-                Some(list) => posts.extend(list.into_iter().enumerate().take(3).map(|(i, e)| (*id, i, e))),
+                Some(list) => posts.extend(list.iter().take(3).cloned().enumerate().map(|(i, e)| (*id, i, e))),
                 None => loading = true,
             }
         }

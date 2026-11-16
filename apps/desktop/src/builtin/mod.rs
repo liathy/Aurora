@@ -58,3 +58,38 @@ pub fn entries<'a>(state: &'a client::State, local: &'a local::LocalState) -> Ve
     }
     out
 }
+
+/// The games whose page data (store details, news…) is kept in memory: the
+/// most recently shown ones. Older games' data is dropped; it comes back
+/// from the disk cache (`store::disk`) when the game is shown again.
+pub(crate) struct RecentApps {
+    order: std::collections::VecDeque<model::AppId>,
+    cap: usize,
+}
+
+impl Default for RecentApps {
+    fn default() -> Self {
+        Self::new(16)
+    }
+}
+
+impl RecentApps {
+    /// `cap` must be above the number of games one screen shows at once.
+    pub fn new(cap: usize) -> Self {
+        Self { order: Default::default(), cap }
+    }
+
+    /// Mark `id` as just shown; returns the game to forget, if any.
+    pub fn touch(&mut self, id: model::AppId) -> Option<model::AppId> {
+        if self.order.back() == Some(&id) {
+            return None;
+        }
+        self.order.retain(|x| *x != id);
+        self.order.push_back(id);
+        if self.order.len() > self.cap { self.order.pop_front() } else { None }
+    }
+
+    pub fn clear(&mut self) {
+        self.order.clear();
+    }
+}

@@ -60,15 +60,8 @@ impl StoreClient {
             "context": { "language": self.language, "country_code": self.country.to_uppercase() },
             "data_request": { "include_reviews": true, "include_tag_count": 12, "include_trailers": true }
         });
-        let resp: Envelope<RawItems> = self
-            .http
-            .get(format!("{API}/IStoreBrowseService/GetItems/v1/"))
-            .query(&[("input_json", input.to_string())])
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
+        let req = self.http.get(format!("{API}/IStoreBrowseService/GetItems/v1/")).query(&[("input_json", input.to_string())]);
+        let resp: Envelope<RawItems> = self.cached_json(req, crate::DETAILS_FOR).await?;
         Ok(resp.response.store_items.into_iter().map(BrowseInfo::from).collect())
     }
 

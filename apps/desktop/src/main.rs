@@ -22,6 +22,7 @@ mod updater;
 mod wayland_activate;
 
 fn main() -> eframe::Result {
+    tune_malloc();
     // A `steam://` link (or a plain second launch) goes to the running copy.
     let link = std::env::args().skip(1).find(|a| a.starts_with("steam://"));
     // `--separate` runs a second copy (for previews and testing).
@@ -57,4 +58,30 @@ fn main() -> eframe::Result {
     // "SteamInRust" names the settings folder (and Wayland app id): kept so
     // existing settings carry over to Aurora.
     ui::native::run("SteamInRust", options, Box::new(move |cc| Ok(Box::new(app::SteamApp::new(cc, link)))))
+}
+
+/// glibc's malloc raises its mmap threshold (up to 32 MiB) each time a big
+/// buffer is freed. After a few decoded pictures (several MB each), they all
+/// come from the heap, and the freed ones stay in the process, scattered:
+/// opening games grew memory by ~100 MB this way. A fixed threshold keeps
+/// big buffers in their own mappings, given back to the system when freed.
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+fn tune_malloc() {
+    // SAFETY: plain allocator settings, set before any other thread starts.
+    unsafe {
+        libc::mallopt(libc::M_MMAP_THRESHOLD, 128 * 1024);
+        libc::mallopt(libc::M_TRIM_THRESHOLD, 128 * 1024);
+    }
+}
+
+#[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+fn tune_malloc() {}
+
+/// Give freed heap memory back to the system (the window just went to the tray).
+pub fn release_memory() {
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    // SAFETY: malloc_trim only returns free pages; it's thread-safe.
+    unsafe {
+        libc::malloc_trim(0);
+    }
 }

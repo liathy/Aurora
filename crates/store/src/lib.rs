@@ -5,6 +5,7 @@
 //! so "Purchase" opens the store page in the system browser.
 
 pub mod browse;
+pub mod disk;
 pub mod gift;
 pub mod events;
 pub mod itad;
@@ -23,9 +24,14 @@ pub enum Error {
     Http(#[from] reqwest::Error),
     #[error("app {0} isn't available in the store")]
     NotFound(AppId),
+    #[error("unexpected answer from Steam: {0}")]
+    Json(#[from] serde_json::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// How long saved store pages are used before asking Steam again.
+const DETAILS_FOR: std::time::Duration = std::time::Duration::from_secs(6 * 60 * 60);
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Price {
@@ -150,6 +156,26 @@ impl StoreClient {
         Ok(self.http.get(url).send().await?.error_for_status()?.json().await?)
     }
 
+    /// JSON through the disk cache ([`disk`]): an answer saved less than
+    /// `max_age` ago is used without asking Steam, and when Steam can't be
+    /// reached an older one is used.
+    pub(crate) async fn cached_json<T: for<'de> Deserialize<'de>>(&self, req: reqwest::RequestBuilder, max_age: std::time::Duration) -> Result<T> {
+        let req = req.build()?;
+        let key = req.url().to_string();
+        if let Some(v) = disk::read(&key, max_age).and_then(|b| serde_json::from_slice(&b).ok()) {
+            return Ok(v);
+        }
+        let fetched: Result<Vec<u8>> = async { Ok(self.http.execute(req).await?.error_for_status()?.bytes().await?.to_vec()) }.await;
+        match fetched {
+            Ok(bytes) => {
+                let v = serde_json::from_slice(&bytes)?;
+                disk::write(&key, &bytes);
+                Ok(v)
+            }
+            Err(e) => disk::read_any(&key).and_then(|b| serde_json::from_slice(&b).ok()).ok_or(e),
+        }
+    }
+
     /// Store front page: spotlight items plus the standard rows.
     pub async fn front(&self) -> Result<(Vec<Item>, Vec<Section>)> {
         let q = format!("cc={}&l={}", self.country, self.language);
@@ -260,7 +286,7 @@ impl StoreClient {
 
     pub async fn details(&self, id: AppId) -> Result<Details> {
         let url = format!("{BASE}/appdetails?appids={id}&cc={}&l={}", self.country, self.language);
-        let mut raw: HashMap<String, RawEnvelope> = self.get(&url).await?;
+        let mut raw: HashMap<String, RawEnvelope> = self.cached_json(self.http.get(&url), DETAILS_FOR).await?;
         let d = raw.remove(&id.to_string()).filter(|e| e.success).and_then(|e| e.data).ok_or(Error::NotFound(id))?;
         let (min, rec) = match d.pc_requirements {
             serde_json::Value::Object(m) => (

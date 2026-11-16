@@ -55,8 +55,10 @@ pub struct Store {
     egui: egui::Context,
     api: StoreClient,
     front: Option<Shared<(Vec<Item>, Vec<Section>)>>,
-    details: HashMap<AppId, Shared<Details>>,
-    browse: HashMap<AppId, Shared<BrowseInfo>>,
+    details: HashMap<AppId, Shared<Arc<Details>>>,
+    browse: HashMap<AppId, Shared<Arc<BrowseInfo>>>,
+    /// Games whose details, info, players and price history are kept.
+    recent: super::RecentApps,
     /// People playing each game right now, refreshed every minute.
     players: HashMap<AppId, Players>,
     tags: Option<Shared<HashMap<u32, String>>>,
@@ -115,6 +117,7 @@ impl Store {
             front: None,
             details: HashMap::new(),
             browse: HashMap::new(),
+            recent: super::RecentApps::new(24),
             players: HashMap::new(),
             tags: None,
             locale: ("us".into(), "english".into()),
@@ -166,10 +169,21 @@ impl Store {
         slot
     }
 
-    fn details(&mut self, id: AppId) -> Option<Details> {
+    /// Keep `id`'s page data; forget the game shown longest ago.
+    fn touch(&mut self, id: AppId) {
+        if let Some(old) = self.recent.touch(id) {
+            self.details.remove(&old);
+            self.browse.remove(&old);
+            self.players.remove(&old);
+            self.history.remove(&old);
+        }
+    }
+
+    fn details(&mut self, id: AppId) -> Option<Arc<Details>> {
+        self.touch(id);
         if !self.details.contains_key(&id) {
             let api = self.api.clone();
-            let slot = self.fetch(async move { api.details(id).await });
+            let slot = self.fetch(async move { api.details(id).await.map(Arc::new) });
             self.details.insert(id, slot);
         }
         match &*self.details[&id].lock().unwrap() {
@@ -178,10 +192,11 @@ impl Store {
         }
     }
 
-    fn browse_info(&mut self, id: AppId) -> Option<BrowseInfo> {
+    fn browse_info(&mut self, id: AppId) -> Option<Arc<BrowseInfo>> {
+        self.touch(id);
         if !self.browse.contains_key(&id) {
             let api = self.api.clone();
-            let slot = self.fetch(async move { api.browse(&[id]).await.map(|mut v| v.pop().unwrap_or_default()) });
+            let slot = self.fetch(async move { api.browse(&[id]).await.map(|mut v| Arc::new(v.pop().unwrap_or_default())) });
             self.browse.insert(id, slot);
         }
         match &*self.browse[&id].lock().unwrap() {
@@ -256,6 +271,7 @@ impl Store {
             self.front = None;
             self.details.clear();
             self.browse.clear();
+            self.recent.clear();
             // Browse results carry prices too: load them again in the new currency.
             self.query = None;
             self.tags = None;
@@ -848,6 +864,7 @@ impl Store {
     fn app_page(&mut self, ui: &mut Ui, t: &Theme, ctx: &mut Ctx, id: AppId) {
         let max = 1200.0;
         let pad = pad_margin(ui, max);
+        self.touch(id);
         let state = self.details.get(&id).map(|s| match &*s.lock().unwrap() {
             Load::Loading => None,
             Load::Ready(d) => Some(Ok(d.clone())),
@@ -905,7 +922,7 @@ impl Store {
                 ui.spacing_mut().item_spacing.x = 24.0;
                 ui.vertical(|ui| {
                     ui.set_width(left_w);
-                    let trailers = self.browse_info(id).map(|b| b.trailers).unwrap_or_default();
+                    let trailers = self.browse_info(id).map(|b| b.trailers.clone()).unwrap_or_default();
                     self.media(ui, t, &d, &trailers, left_w);
                 });
                 ui.vertical(|ui| {
@@ -1473,8 +1490,8 @@ impl Store {
 
     /// Steam-style mature content notice instead of the page.
     fn mature_gate(&mut self, ui: &mut Ui, t: &Theme, id: AppId) {
-        let name = self.details(id).map(|d| d.name).unwrap_or_default();
-        let notes = self.details(id).and_then(|d| d.content_notes);
+        let name = self.details(id).map(|d| d.name.clone()).unwrap_or_default();
+        let notes = self.details(id).and_then(|d| d.content_notes.clone());
         ui.add_space(80.0);
         w::centered(ui, 560.0, 32.0, |ui| {
             w::card(t).show(ui, |ui| {

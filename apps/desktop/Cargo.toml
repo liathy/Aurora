@@ -53,3 +53,5 @@ raw-window-handle = "0.6"
 wayland-backend = { version = "0.3", features = ["client_system"] }
 wayland-client = "0.31"
 wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+# mallopt / malloc_trim (main.rs: memory given back to the system).
+libc = "0.2"
