@@ -541,7 +541,7 @@ impl Store {
                 if local.len() >= 2 {
                     let pts: Vec<(u64, f64)> = local.iter().map(|(t, c)| (*t, *c as f64 / 100.0)).collect();
                     chart(ui, t, &pts, "");
-                    ui.label(w::text(t!("Prices you've seen in SteamInRust."), 12.0, t.text_faint));
+                    ui.label(w::text(t!("Prices you've seen in Aurora."), 12.0, t.text_faint));
                 } else {
                     ui.label(w::text(t!("Add a free IsThereAnyDeal API key in Settings → Store preferences to see this game's full price history and all-time low."), 13.0, t.text_dim));
                 }

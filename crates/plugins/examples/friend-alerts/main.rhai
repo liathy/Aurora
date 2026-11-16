@@ -1,4 +1,4 @@
-// Friend Alerts: an example SteamInRust plugin.
+// Friend Alerts: an example Aurora plugin.
 // Watches friends coming online / starting games and shows notifications.
 
 let recent = [];

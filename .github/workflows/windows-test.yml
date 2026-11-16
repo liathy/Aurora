@@ -120,7 +120,7 @@ jobs:
             Copy-Item $setup.FullName $dir
             if ($gl -eq 'opengl') { Copy-Item mesa-gl\*.dll $dir }
             $ok["setup-$gl"] = Run "setup-$gl" (Join-Path $dir $setup.Name) $null $dir 15
-            $ok["app-$gl"] = Run "app-$gl" "$dir\steam-rs.exe" @('--demo') $dir 30
+            $ok["app-$gl"] = Run "app-$gl" "$dir\aurora.exe" @('--demo') $dir 30
             # Which renderer drew it: the fallback logs this line.
             $fellBack = [bool](Select-String -Path "$smoke\app-$gl-*.log" -Pattern 'using Direct3D 12 instead' -Quiet)
             Write-Host "=== app-${gl}: fell back to Direct3D 12: $fellBack"

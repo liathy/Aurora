@@ -1,6 +1,6 @@
 //! # User plugins
 //!
-//! The SteamInRust answer to SteamBrew/Millennium, without injecting into
+//! The Aurora answer to SteamBrew/Millennium, without injecting into
 //! anything: plugins are folders in the user's plugin directory:
 //!
 //! ```text

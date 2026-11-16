@@ -1250,7 +1250,7 @@ pub struct ChatMessage {
     pub text: String,
     /// Unix seconds.
     pub time: u64,
-    /// A game invite (Steam's `[gameinvite]`, or an older SteamInRust
+    /// A game invite (Steam's `[gameinvite]`, or an older Aurora
     /// "steam://run" link), shown as a card with a Join button.
     #[serde(default)]
     pub invite: Option<GameInvite>,
@@ -1353,7 +1353,7 @@ pub mod chat {
             rest = &rest[c.len_utf8()..];
         }
         let text = out.trim().to_string();
-        // SteamInRust's invites: "Play X with me! steam://run/123//+args".
+        // Aurora's invites: "Play X with me! steam://run/123//+args".
         if invite.is_none() {
             invite = link_invite(&text);
         }

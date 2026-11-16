@@ -412,7 +412,7 @@ impl Jingle {
         }
     }
 
-    /// Forget a player (they turned out to run SteamInRust).
+    /// Forget a player (they turned out to run Aurora).
     pub fn forget(&mut self, id: u64) {
         self.peers.remove(&id);
     }

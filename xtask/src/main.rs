@@ -89,7 +89,7 @@ fn steamclient32(release: bool) -> Result<PathBuf> {
 fn package() -> Result {
     let root = root();
     let version = version(&root)?;
-    println!("Packaging SteamInRust {version}");
+    println!("Packaging Aurora {version}");
 
     let pkg = root.join("target").join("package");
     let stage = pkg.join("stage");
@@ -99,9 +99,9 @@ fn package() -> Result {
         fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
 
-    cargo(&root, &["build", "--release", "-p", "steam-rs", "-p", "steamclient", "-p", "steamhost"], &[], None)?;
+    cargo(&root, &["build", "--release", "-p", "aurora", "-p", "steamclient", "-p", "steamhost"], &[], None)?;
     let release = root.join("target").join("release");
-    copy(&release.join("steam-rs.exe"), &stage.join("steam-rs.exe"))?;
+    copy(&release.join("aurora.exe"), &stage.join("aurora.exe"))?;
     copy(&release.join("steamclient.dll"), &stage.join("steamclient.dll"))?;
     // The headless Steam host for Steam-DRM games (loads the user's own
     // steamclient64.dll; nothing of Valve's is bundled).
@@ -120,8 +120,11 @@ fn package() -> Result {
     zip_dir(&stage, &payload)?;
 
     cargo(&root, &["build", "--release", "-p", "installer"], &[("SIR_PAYLOAD", payload.as_os_str())], None)?;
-    copy(&release.join("SteamInRust-Setup.exe"), &dist.join(format!("SteamInRust-Setup-{version}.exe")))?;
-    copy(&payload, &dist.join(format!("SteamInRust-{version}-portable.zip")))?;
+    copy(&release.join("Aurora-Setup.exe"), &dist.join(format!("Aurora-Setup-{version}.exe")))?;
+    // Copies from before the rename (0.7.2 and older) only update to a
+    // "SteamInRust-Setup…" file: the same setup under that name too.
+    copy(&release.join("Aurora-Setup.exe"), &dist.join(format!("SteamInRust-Setup-{version}.exe")))?;
+    copy(&payload, &dist.join(format!("Aurora-{version}-portable.zip")))?;
 
     // LF line endings and no BOM, like sha256sum writes.
     let mut files: Vec<_> = fs::read_dir(&dist).map_err(|e| e.to_string())?.flatten().map(|e| e.path()).collect();

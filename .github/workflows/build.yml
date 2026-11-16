@@ -33,14 +33,14 @@ jobs:
       # the app and the steamhost helper (the headless Steam host for
       # DRM games); tests for the crates that are platform-neutral.
       - name: Build
-        run: cargo build --release --locked -p steam-rs -p steamhost
+        run: cargo build --release --locked -p aurora -p steamhost
 
       # Ubuntu 22.04 has glibc 2.35, so the binaries also start on older
       # distros (Ubuntu 22.04, Mint 21, Debian 12). Fail if one needs newer.
       - name: Check the glibc the binaries need
         run: |
           max=2.35
-          for f in target/release/steam-rs target/release/steamhost; do
+          for f in target/release/aurora target/release/steamhost; do
             need=$(objdump -T "$f" | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -uV | tail -n1)
             echo "$f needs glibc $need"
             if [ "$(printf '%s\n%s\n' "$need" "$max" | sort -V | tail -n1)" != "$max" ]; then
@@ -53,15 +53,15 @@ jobs:
 
       - name: Package
         run: |
-          name=SteamOnRust-Linux-x86_64
+          name=Aurora-Linux-x86_64
           mkdir -p dist/$name
-          cp target/release/steam-rs target/release/steamhost README.md LICENSE dist/$name/
+          cp target/release/aurora target/release/steamhost README.md LICENSE dist/$name/
           tar -C dist -czf dist/$name.tar.gz $name
           (cd dist && sha256sum $name.tar.gz > $name.tar.gz.sha256)
 
       - uses: actions/upload-artifact@v4
         with:
-          name: SteamOnRust-Linux-x86_64
+          name: Aurora-Linux-x86_64
           path: |
             dist/*.tar.gz
             dist/*.sha256
@@ -105,6 +105,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: SteamOnRust-Windows
+          name: Aurora-Windows
           path: target/package/dist/*
           retention-days: 30

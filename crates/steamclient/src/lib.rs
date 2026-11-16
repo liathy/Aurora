@@ -6,7 +6,7 @@
 //! uses C++ interfaces (ISteamUser, ISteamUserStats…) plus a few plain
 //! exports for callbacks (`Steam_BGetCallback`, `Steam_GetAPICallResult`…).
 //!
-//! SteamInRust points that registry value at this DLL for games it starts
+//! Aurora points that registry value at this DLL for games it starts
 //! (games without anti-cheat only) and gives them `STEAMINRUST_IPC`, the pipe
 //! and token to reach the app. This DLL answers the game from what the app
 //! sends over that pipe.
@@ -72,7 +72,7 @@ macro_rules! log {
 }
 
 enum Mode {
-    /// A game SteamInRust started: we answer.
+    /// A game Aurora started: we answer.
     Ours,
     /// Anything else: Valve's steamclient (module handle, 0 if missing).
     Forward(usize),
@@ -82,7 +82,7 @@ fn mode() -> &'static Mode {
     static MODE: OnceLock<Mode> = OnceLock::new();
     MODE.get_or_init(|| {
         if ipc::target().is_some() {
-            log!("steamclient: answering for SteamInRust (app {})", state::env_app_id());
+            log!("steamclient: answering for Aurora (app {})", state::env_app_id());
             Mode::Ours
         } else {
             Mode::Forward(win::load_real_steamclient())
@@ -162,7 +162,7 @@ fn create_interface(version: usize, err: usize) -> usize {
 /// Games reach Steam through steam_api. CreateInterface called from anywhere
 /// else at startup is Steam's DRM wrapper (SteamStub, or a packer carrying
 /// it, like PRAGMATA's) checking for Valve's client: it would show
-/// "Application load error 3:0000065432", so tell SteamInRust, which
+/// "Application load error 3:0000065432", so tell Aurora, which
 /// restarts the game on Valve's engine. (Where the version string lives says
 /// nothing: Unity games' steam_api passes one from the game.)
 fn steam_drm_check(version: usize) {

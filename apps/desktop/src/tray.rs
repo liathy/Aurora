@@ -68,7 +68,7 @@ impl Tray {
         let icon = cfg!(windows)
             .then(|| {
                 TrayIconBuilder::new()
-                    .with_tooltip("SteamInRust")
+                    .with_tooltip("Aurora")
                     .with_icon(tray_icon::Icon::from_rgba(ui::brand::icon_rgba(32), 32, 32).expect("valid icon"))
                     .build()
                     .map_err(|e| tracing::warn!("tray icon unavailable: {e}"))
@@ -221,7 +221,7 @@ fn contents(d: &MenuData, ui: &mut Ui, t: &Theme) -> Option<TrayCmd> {
             });
         } else {
             w::logo(ui, t, 26.0);
-            ui.label(w::text_semibold("SteamInRust", 14.0, t.text));
+            ui.label(w::text_semibold("Aurora", 14.0, t.text));
         }
     });
     if d.signed_in {
@@ -270,7 +270,7 @@ fn contents(d: &MenuData, ui: &mut Ui, t: &Theme) -> Option<TrayCmd> {
         }
     }
     separator(ui, t);
-    if row(ui, t, icons::POWER, t!("Exit SteamInRust"), None, t.danger) {
+    if row(ui, t, icons::POWER, t!("Exit Aurora"), None, t.danger) {
         picked = Some(TrayCmd::Exit);
     }
     picked

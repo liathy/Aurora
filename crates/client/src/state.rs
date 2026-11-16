@@ -83,7 +83,7 @@ pub struct State {
     pub game_lobby: Option<u64>,
     /// The running game's join string, rich presence `connect` ("Invite to game").
     pub game_connect: Option<String>,
-    /// How each game was last started (SteamInRust / official Steam / no Steam).
+    /// How each game was last started (Aurora / official Steam / no Steam).
     pub launch_modes: HashMap<AppId, crate::LaunchMode>,
     pub last_error: Option<String>,
     pub guard_error: Option<String>,

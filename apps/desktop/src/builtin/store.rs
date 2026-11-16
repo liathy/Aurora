@@ -343,7 +343,7 @@ impl Store {
 
 impl Extension for Store {
     fn manifest(&self) -> Manifest {
-        Manifest { id: "store", name: "Store", author: "SteamInRust", description: "The Steam store, rendered natively", core: true, ..Manifest::DEFAULT }
+        Manifest { id: "store", name: "Store", author: "Aurora", description: "The Steam store, rendered natively", core: true, ..Manifest::DEFAULT }
     }
 
     fn pages(&self) -> Vec<PageSpec> {

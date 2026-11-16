@@ -1,6 +1,6 @@
 # Steam parity
 
-How much of the official Steam desktop client SteamInRust covers, area by
+How much of the official Steam desktop client Aurora covers, area by
 area. Last checked against the code on 8 November 2026 (v0.3.0).
 
 Scores: **0** not started · **0.25** started · **0.5** usable, big parts
@@ -71,7 +71,7 @@ Steam's website" still works; it just isn't native yet.
 
 | | |
 | --- | --- |
-| SteamInRust's own depot downloader (manifests, chunks, decryption, decompression) | Done |
+| Aurora's own depot downloader (manifests, chunks, decryption, decompression) | Done |
 | Queue, pause, resume, cancel; the download survives a restart and resumes | Done |
 | Separate network and disk speeds, and what it's doing (downloading, writing to disk, verifying) | Done |
 | Every Steam download region and partner CDNs, sorted by measured speed | Done |
@@ -145,16 +145,16 @@ Details: [steam-compatibility.md](steam-compatibility.md).
 
 | | |
 | --- | --- |
-| Games without anti-cheat use SteamInRust's own `steamclient` DLL, 64-bit and 32-bit | Done |
+| Games without anti-cheat use Aurora's own `steamclient` DLL, 64-bit and 32-bit | Done |
 | Games with VAC, Easy Anti-Cheat or BattlEye start through the official client, silently | Done. Our DLL is never used for them |
 | User, apps, achievements, stats, cloud, friends, auth tickets, encrypted app tickets | Done |
 | Lobbies (`ISteamMatchmaking`) through Steam's matchmaking service | Done |
-| P2P (`ISteamNetworking`) between SteamInRust players | Done, with UDP hole punching |
+| P2P (`ISteamNetworking`) between Aurora players | Done, with UDP hole punching |
 | P2P (`ISteamNetworking`) with players on the official client | Done: Valve's libjingle protocol, direct or through Valve's relays. Tested joining an official player's Human Fall Flat lobby |
 | Leaderboards, global achievement percentages, avatars, `ISteamHTTP` | Done |
 | Exact interface layouts for SDK 1.3x–1.6x (91 versions, both bitnesses) | Done |
 | `ISteamNetworkingSockets` / `ISteamNetworkingMessages` with players on the official client | Partly: Valve's protocol (Steam-signed certificates, rendezvous, encrypted SNP) over direct ICE connections, which official players allow for friends. No Steam Datagram Relay, which the official client uses for strangers. Not yet tested against an official player |
-| `ISteamNetworkingSockets`, `ISteamNetworkingMessages` between SteamInRust players | Done, on Valve's protocol over ICE (P2P; connecting by IP to dedicated servers isn't possible) |
+| `ISteamNetworkingSockets`, `ISteamNetworkingMessages` between Aurora players | Done, on Valve's protocol over ICE (P2P; connecting by IP to dedicated servers isn't possible) |
 | Workshop (`ISteamUGC`): queries, subscriptions, votes, favorites, downloads | Done. Publishing items isn't supported |
 | Inventory (`ISteamInventory`): items, drops, promos, crafting, properties | Done. Item definitions don't load yet; no purchases |
 | Server browser (`ISteamMatchmakingServers`): internet and LAN lists, ping, players, rules | Done |
@@ -167,7 +167,7 @@ Details: [steam-compatibility.md](steam-compatibility.md).
 | | |
 | --- | --- |
 | Opens over the running game with Shift+Tab, only while the game's window is in front | Done |
-| Drawn inside the game, like Steam's, so it works in exclusive full screen and the game keeps focus | Done for D3D11 games SteamInRust starts with its steamclient (32- and 64-bit). D3D9, D3D12, OpenGL and Vulkan games get the window overlay, which shows over windowed and borderless games only |
+| Drawn inside the game, like Steam's, so it works in exclusive full screen and the game keeps focus | Done for D3D11 games Aurora starts with its steamclient (32- and 64-bit). D3D9, D3D12, OpenGL and Vulkan games get the window overlay, which shows over windowed and borderless games only |
 | Mouse and keyboard go to the overlay while it's open; the cursor shows and the game gets `GameOverlayActivated_t` | Done |
 | Game overview, achievements, friends, chat, notes, guides, discussions, hub, store page | Done, in floating windows |
 | Pin windows over the game with adjustable opacity | Done |

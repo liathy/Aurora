@@ -240,9 +240,9 @@ pub enum Event {
     /// The `STEAMINRUST_IPC` value for a game started by hand ([`Command::AttachGame`]).
     GameAttached { app_id: AppId, env: String },
     /// A game asked for Steam's overlay (see `ipc::protocol::Request::Overlay`
-    /// for `dialog` and `target`): SteamInRust's overlay should open there.
+    /// for `dialog` and `target`): Aurora's overlay should open there.
     GameOverlay { app_id: AppId, dialog: String, target: String },
-    /// How a game is being started: with SteamInRust's steamclient, through
+    /// How a game is being started: with Aurora's steamclient, through
     /// the official Steam client (anti-cheat), or without Steam features.
     LaunchMode { app_id: AppId, mode: LaunchMode },
     /// A game's shaders are compiling before it starts (`done` of `total`
@@ -256,7 +256,7 @@ pub enum Event {
     /// wasn't started because of conflicts (its launch arguments).
     CloudReport { report: model::CloudReport, held_launch: Option<String> },
     GameStopped { app_id: AppId },
-    /// A game was stopped because its Steam DRM refused SteamInRust's
+    /// A game was stopped because its Steam DRM refused Aurora's
     /// steamclient; Play it again (it now starts on Valve's engine).
     RelaunchForSteamDrm { app_id: AppId },
     /// The running game entered (`Some`) or left a matchmaking lobby, so

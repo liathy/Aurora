@@ -3,7 +3,7 @@
 //! The app's old overlay was a separate always-on-top window. Exclusive
 //! fullscreen games minimize when another window takes focus, so Shift+Tab
 //! hid the game. Steam draws its overlay inside the game instead, and so do
-//! we, for games SteamInRust starts with this DLL:
+//! we, for games Aurora starts with this DLL:
 //!
 //! - `d3d11`: hooks the game's `Present` and draws the overlay on top of
 //!   each frame (D3D11 games; others keep the app's window overlay).
@@ -34,7 +34,7 @@ pub enum TexOp {
     Free(u64),
 }
 
-/// Start the overlay for a game SteamInRust started (once per process).
+/// Start the overlay for a game Aurora started (once per process).
 pub fn start() {
     #[cfg(windows)]
     {

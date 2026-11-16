@@ -3,9 +3,9 @@
 //! Players on Valve's official client are reached with the protocol their
 //! client uses for this API, libjingle 0.4.0 (see [`crate::jingle`]). When
 //! the game first sends to someone we offer both: our own signal and
-//! libjingle candidates. A SteamInRust player answers our signal; an
+//! libjingle candidates. A Aurora player answers our signal; an
 //! official client answers with candidates of its own. Between two
-//! SteamInRust players it works like this:
+//! Aurora players it works like this:
 //!
 //! 1. Each side opens one UDP socket and learns its addresses: LAN
 //!    addresses, and the public one from a STUN server.
@@ -65,7 +65,7 @@ const CHUNK: usize = 1100;
 const MAX_UNRELIABLE: usize = 1200;
 const MAX_RELIABLE: usize = 1024 * 1024;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
-/// A SteamInRust player answers our signal through Steam within about a
+/// A Aurora player answers our signal through Steam within about a
 /// second, an official client with libjingle candidates once its game
 /// accepted the session. Neither after this long: fail the session like
 /// Steam does, so the game shows its own "couldn't connect".
@@ -100,7 +100,7 @@ struct Peer {
     channels: HashMap<i32, Channel>,
     failed: bool,
     announced: bool,
-    /// Their signal (or a packet) reached us: they run SteamInRust.
+    /// Their signal (or a packet) reached us: they run Aurora.
     answered: bool,
     /// Round trip of the last answered PING.
     rtt: Option<Duration>,
@@ -221,7 +221,7 @@ impl Endpoint {
             return;
         };
         crate::log!("p2p: signal from {from}: {} address(es)", candidates.len());
-        // They run SteamInRust: no libjingle session with them.
+        // They run Aurora: no libjingle session with them.
         if self.jingle.lock().unwrap().knows(from) {
             self.jingle.lock().unwrap().forget(from);
             self.jsock.lock().unwrap().remove(&from);
@@ -341,7 +341,7 @@ impl Endpoint {
 
     fn on_official_candidate(self: &Arc<Self>, from: u64, c: crate::jingle::Candidate) {
         if self.peers.lock().unwrap().get(&from).is_some_and(|p| p.answered) {
-            return; // a SteamInRust player: our own protocol
+            return; // a Aurora player: our own protocol
         }
         let Some(local) = self.official_socket(from) else { return };
         {
@@ -690,7 +690,7 @@ impl Endpoint {
             let waited = p.since.elapsed();
             if p.addr.is_none() && !p.failed && (waited > CONNECT_TIMEOUT || !p.answered && waited > NO_ANSWER_TIMEOUT) {
                 if !p.answered {
-                    crate::log!("p2p: {id} never answered (not on SteamInRust?)");
+                    crate::log!("p2p: {id} never answered (not on Aurora?)");
                 }
                 p.failed = true;
                 p.waiting.clear();

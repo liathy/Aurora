@@ -1,12 +1,12 @@
 //! ISteamMatchmakingServers: the server browser. Internet lists come from
-//! Steam's master server through SteamInRust; every server is then asked
+//! Steam's master server through Aurora; every server is then asked
 //! for its current state and ping with Valve's server query protocol
 //! (A2S_INFO over UDP), like Steam's client does. LAN lists broadcast
 //! A2S_INFO. Ping, player and rules queries ask the server directly.
 //!
 //! Results reach the game through its own response objects, called on its
 //! thread during SteamAPI_RunCallbacks. Friends, favorites, history and
-//! spectator lists come back empty: SteamInRust keeps no such lists yet.
+//! spectator lists come back empty: Aurora keeps no such lists yet.
 
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 

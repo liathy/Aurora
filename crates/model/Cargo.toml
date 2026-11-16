@@ -1,6 +1,6 @@
 [package]
 name = "model"
-description = "Shared data types for SteamInRust"
+description = "Shared data types for Aurora"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -1,4 +1,4 @@
-//! Everything the DLL remembers: the session from SteamInRust, queued
+//! Everything the DLL remembers: the session from Aurora, queued
 //! callbacks, finished API calls, stats and achievements.
 
 use crate::protocol::{Achievement, Reply, Request, Session, Stat, Stats};
@@ -241,7 +241,7 @@ pub fn env_app_id() -> u32 {
     std::env::var("SteamAppId").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(0)
 }
 
-/// Talk to SteamInRust once: load who's signed in and the game's stats.
+/// Talk to Aurora once: load who's signed in and the game's stats.
 /// Returns whether a session exists. Never called with the lock held.
 pub fn ensure_session() -> bool {
     {
@@ -272,7 +272,7 @@ pub fn ensure_session() -> bool {
             true
         }
         other => {
-            crate::log!("no session from SteamInRust: {other:?}");
+            crate::log!("no session from Aurora: {other:?}");
             false
         }
     }
@@ -349,7 +349,7 @@ mod tests {
     }
 }
 
-/// A folder SteamInRust named, as this process sees it. Under Proton the
+/// A folder Aurora named, as this process sees it. Under Proton the
 /// app sends Linux paths: Wine converts them (to the library's drive letter,
 /// e.g. E:\SteamLibrary\…, with names Windows can't use mangled); failing
 /// that, drive Z: is the Linux root.

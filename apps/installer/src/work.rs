@@ -6,9 +6,15 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-pub const APP_EXE: &str = "steam-rs.exe";
+pub const APP_EXE: &str = "aurora.exe";
 pub const UNINSTALL_EXE: &str = "uninstall.exe";
-const UNINSTALL_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\SteamInRust";
+const UNINSTALL_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Aurora";
+/// Names from before the rename to Aurora (0.7.2 and older): an update
+/// moves an install over from them.
+const OLD_EXE: &str = "steam-rs.exe";
+const OLD_UNINSTALL_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\SteamInRust";
+const OLD_LINK: &str = "SteamInRust.lnk";
+const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
 const STEAM_LINK_KEY: &str = r"HKCU\Software\Classes\steam\shell\open\command";
 
 /// The app files, zipped (see build.rs).
@@ -53,23 +59,27 @@ fn log(p: &Shared, line: String) {
 
 pub fn default_dir() -> PathBuf {
     let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
-    base.join("Programs").join("SteamInRust")
+    base.join("Programs").join("Aurora")
 }
 
 /// Where an earlier install lives, from its "Apps & features" entry.
 pub fn installed_dir() -> Option<PathBuf> {
-    let out = reg(&["query", UNINSTALL_KEY, "/v", "InstallLocation"])?;
-    let line = out.lines().find(|l| l.contains("REG_SZ"))?;
-    let path = PathBuf::from(line.split("REG_SZ").nth(1)?.trim());
-    path.join(APP_EXE).exists().then_some(path)
+    [UNINSTALL_KEY, OLD_UNINSTALL_KEY].iter().find_map(|key| {
+        let out = reg(&["query", key, "/v", "InstallLocation"])?;
+        let line = out.lines().find(|l| l.contains("REG_SZ"))?;
+        let path = PathBuf::from(line.split("REG_SZ").nth(1)?.trim());
+        (path.join(APP_EXE).exists() || path.join(OLD_EXE).exists()).then_some(path)
+    })
 }
 
 /// Install or update. Waits up to `wait` for a running copy to close.
 pub fn install(opts: &Options, p: &Shared, wait: Duration) -> Result<(), String> {
     std::fs::create_dir_all(&opts.dir).map_err(|e| format!("{}: {e}", opts.dir.display()))?;
     log(p, format!("Output folder: {}", opts.dir.display()));
-    set(p, |g| g.file = i18n::tr_dyn("Waiting for SteamInRust to close…"));
+    set(p, |g| g.file = i18n::tr_dyn("Waiting for Aurora to close…"));
     wait_unlocked(&opts.dir.join(APP_EXE), wait)?;
+    // An update from before the rename: the running copy is steam-rs.exe.
+    wait_unlocked(&opts.dir.join(OLD_EXE), wait)?;
 
     let mut zip = zip::ZipArchive::new(Cursor::new(PAYLOAD)).map_err(|e| format!("payload: {e}"))?;
     let total: u64 = (0..zip.len()).filter_map(|i| zip.by_index(i).ok().map(|f| f.size())).sum::<u64>().max(1);
@@ -111,6 +121,7 @@ pub fn install(opts: &Options, p: &Shared, wait: Duration) -> Result<(), String>
         g.file = i18n::tr_dyn("Creating shortcuts…");
     });
     let exe = opts.dir.join(APP_EXE);
+    migrate_old_names(&opts.dir, &exe, p);
     if !opts.update {
         let _ = remove_shortcuts();
         if opts.start_menu {
@@ -118,7 +129,7 @@ pub fn install(opts: &Options, p: &Shared, wait: Duration) -> Result<(), String>
             log(p, format!("Create shortcut: {}", start_menu_link().display()));
         }
         if opts.desktop {
-            let link = desktop_dir()?.join("SteamInRust.lnk");
+            let link = desktop_dir()?.join("Aurora.lnk");
             shortcut(&link, &exe)?;
             log(p, format!("Create shortcut: {}", link.display()));
         }
@@ -135,7 +146,7 @@ pub fn install(opts: &Options, p: &Shared, wait: Duration) -> Result<(), String>
 
 /// Remove the app. `data`: also delete settings, saved sign-ins and caches.
 pub fn uninstall(dir: &Path, data: bool, p: &Shared) -> Result<(), String> {
-    set(p, |g| g.file = i18n::tr_dyn("Waiting for SteamInRust to close…"));
+    set(p, |g| g.file = i18n::tr_dyn("Waiting for Aurora to close…"));
     wait_unlocked(&dir.join(APP_EXE), Duration::from_secs(20))?;
     set(p, |g| {
         g.fraction = 0.2;
@@ -144,8 +155,11 @@ pub fn uninstall(dir: &Path, data: bool, p: &Shared) -> Result<(), String> {
     let _ = remove_shortcuts();
     restore_steam_links(dir);
     let _ = reg(&["delete", UNINSTALL_KEY, "/f"]);
-    // Startup entry, if the app added one.
-    let _ = reg(&["delete", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run", "/v", "SteamInRust", "/f"]);
+    let _ = reg(&["delete", OLD_UNINSTALL_KEY, "/f"]);
+    // Startup entry, if the app added one (under either name).
+    for name in ["Aurora", "SteamInRust"] {
+        let _ = reg(&["delete", RUN_KEY, "/v", name, "/f"]);
+    }
     set(p, |g| {
         g.fraction = 0.4;
         g.file = i18n::tr_dyn("Removing files…");
@@ -219,7 +233,7 @@ fn wait_unlocked(exe: &Path, wait: Duration) -> Result<(), String> {
             return Ok(());
         }
         if start.elapsed() > wait {
-            return Err(i18n::tr_dyn("SteamInRust is still running. Close it (also from the tray) and try again."));
+            return Err(i18n::tr_dyn("Aurora is still running. Close it (also from the tray) and try again."));
         }
         std::thread::sleep(Duration::from_millis(300));
     }
@@ -230,9 +244,9 @@ fn register(dir: &Path) -> Result<(), String> {
     let un = dir.join(UNINSTALL_EXE).display().to_string();
     let size_kb: u64 = std::fs::read_dir(dir).map(|r| r.flatten().filter_map(|e| e.metadata().ok()).map(|m| m.len()).sum::<u64>() / 1024).unwrap_or(0);
     let values: [(&str, &str, String); 10] = [
-        ("DisplayName", "REG_SZ", "SteamInRust".into()),
+        ("DisplayName", "REG_SZ", "Aurora".into()),
         ("DisplayVersion", "REG_SZ", env!("CARGO_PKG_VERSION").into()),
-        ("Publisher", "REG_SZ", "SteamInRust".into()),
+        ("Publisher", "REG_SZ", "Aurora".into()),
         ("DisplayIcon", "REG_SZ", format!("{exe},0")),
         ("InstallLocation", "REG_SZ", dir.display().to_string()),
         ("UninstallString", "REG_SZ", format!("\"{un}\" --uninstall")),
@@ -267,7 +281,7 @@ fn restore_steam_links(dir: &Path) {
 
 fn start_menu_link() -> PathBuf {
     let base = std::env::var_os("APPDATA").map(PathBuf::from).unwrap_or_default();
-    base.join(r"Microsoft\Windows\Start Menu\Programs\SteamInRust.lnk")
+    base.join(r"Microsoft\Windows\Start Menu\Programs\Aurora.lnk")
 }
 
 fn desktop_dir() -> Result<PathBuf, String> {
@@ -277,15 +291,53 @@ fn desktop_dir() -> Result<PathBuf, String> {
 
 fn remove_shortcuts() -> Result<(), String> {
     let _ = std::fs::remove_file(start_menu_link());
-    let _ = std::fs::remove_file(desktop_dir()?.join("SteamInRust.lnk"));
+    let _ = std::fs::remove_file(start_menu_link().with_file_name(OLD_LINK));
+    let desktop = desktop_dir()?;
+    let _ = std::fs::remove_file(desktop.join("Aurora.lnk"));
+    let _ = std::fs::remove_file(desktop.join(OLD_LINK));
     Ok(())
+}
+
+/// Move an install from before the rename over to Aurora's names: the old
+/// program file, its "Apps & features" entry, shortcuts (kept where they
+/// were, under the new name) and `steam://` links pointing at steam-rs.exe.
+fn migrate_old_names(dir: &Path, exe: &Path, p: &Shared) {
+    let old = dir.join(OLD_EXE);
+    if old.exists() && std::fs::remove_file(&old).is_ok() {
+        log(p, format!("Delete file: {}", old.display()));
+    }
+    let _ = reg(&["delete", OLD_UNINSTALL_KEY, "/f"]);
+    let start_old = start_menu_link().with_file_name(OLD_LINK);
+    if start_old.exists() {
+        let _ = std::fs::remove_file(&start_old);
+        let _ = shortcut(&start_menu_link(), exe);
+        log(p, format!("Create shortcut: {}", start_menu_link().display()));
+    }
+    if let Ok(desktop) = desktop_dir() {
+        let old_link = desktop.join(OLD_LINK);
+        if old_link.exists() {
+            let _ = std::fs::remove_file(&old_link);
+            let _ = shortcut(&desktop.join("Aurora.lnk"), exe);
+            log(p, format!("Create shortcut: {}", desktop.join("Aurora.lnk").display()));
+        }
+    }
+    if let Some(out) = reg(&["query", STEAM_LINK_KEY, "/ve"]) {
+        if let Some(cmd) = out.lines().find(|l| l.contains("REG_SZ")).and_then(|l| l.split("REG_SZ").nth(1)).map(str::trim) {
+            let old_path = old.display().to_string();
+            if cmd.to_lowercase().contains(&old_path.to_lowercase()) {
+                let new = format!("\"{}\" \"%1\"", exe.display());
+                let _ = reg(&["add", STEAM_LINK_KEY, "/ve", "/d", &new, "/f"]);
+                log(p, "steam:// links now open Aurora".into());
+            }
+        }
+    }
 }
 
 fn shortcut(link: &Path, target: &Path) -> Result<(), String> {
     let q = |p: &Path| p.display().to_string().replace('\'', "''");
     let dir = target.parent().unwrap_or(target);
     let script = format!(
-        "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{}');$s.TargetPath='{}';$s.WorkingDirectory='{}';$s.IconLocation='{},0';$s.Description='SteamInRust';$s.Save()",
+        "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{}');$s.TargetPath='{}';$s.WorkingDirectory='{}';$s.IconLocation='{},0';$s.Description='Aurora';$s.Save()",
         q(link),
         q(target),
         q(dir),

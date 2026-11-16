@@ -551,7 +551,7 @@ async fn online(
     macro_rules! launch_now {
         ($app_id:expr, $install_dir:expr, $args:expr) => {{
             let (app_id, install_dir, args): (AppId, std::path::PathBuf, String) = ($app_id, $install_dir, $args);
-            // Steam's download and shader settings as chosen in SteamInRust,
+            // Steam's download and shader settings as chosen in Aurora,
             // before anything of Steam's starts for this game.
             if !st.shader_jobs.contains_key(&app_id) && !st.running.contains_key(&app_id) {
                 launch::apply_steam_prefs();
@@ -2285,7 +2285,7 @@ impl Online {
                 });
                 return Ok(());
             }
-            crate::LaunchMode::SteamInRust => {
+            crate::LaunchMode::Aurora => {
                 let token = self.ipc.register(app_id);
                 let is64 = launch::exe_is_64bit(app, dir).unwrap_or(true);
                 let dll = launch::steamclient_dll(is64);
@@ -2343,7 +2343,7 @@ impl Online {
         let (conn, me) = (self.conn.clone(), self.me);
         match req {
             Request::Hello if self.link != Link::Online => {
-                tracing::info!("game {app_id} (pid {pid}) connected to SteamInRust's steamclient (offline)");
+                tracing::info!("game {app_id} (pid {pid}) connected to Aurora's steamclient (offline)");
                 launch::swap_loaded(&token);
                 let mut session = self.ipc_session(app_id);
                 session.stats = offline::offline_view(&offline::load_stats(me, app_id));
@@ -2360,7 +2360,7 @@ impl Online {
                 let _ = reply.send(Reply::Stored { eresult: eresult::OK, crc });
             }
             Request::Hello => {
-                tracing::info!("game {app_id} (pid {pid}) connected to SteamInRust's steamclient");
+                tracing::info!("game {app_id} (pid {pid}) connected to Aurora's steamclient");
                 launch::swap_loaded(&token);
                 let session = self.ipc_session(app_id);
                 let language = session.game_language.clone();

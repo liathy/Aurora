@@ -1,10 +1,10 @@
-## SteamInRust 0.1.0, the first release
+## Aurora 0.1.0, the first release
 
 A native Steam client written in Rust: store, library, downloads, Steam Cloud,
 friends and chat, community pages, inventory and market, all without a web
 browser inside.
 
-**Install:** download `SteamInRust-Setup-0.1.0.exe` below and run it. No
+**Install:** download `Aurora-Setup-0.1.0.exe` below and run it. No
 administrator rights needed. Future versions install themselves.
 
 **Highlights**
@@ -22,4 +22,4 @@ administrator rights needed. Future versions install themselves.
 Windows may warn about an unrecognized app (the setup isn't code-signed yet):
 choose **More info → Run anyway**. Check files against `SHA256SUMS.txt`.
 
-SteamInRust is not affiliated with Valve.
+Aurora is not affiliated with Valve.

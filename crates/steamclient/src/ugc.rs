@@ -1,5 +1,5 @@
 //! ISteamUGC: the Workshop for games. Queries, subscriptions, votes and
-//! favorites go to Steam's PublishedFile service through SteamInRust;
+//! favorites go to Steam's PublishedFile service through Aurora;
 //! items download into `steamapps/workshop/content/<app>/<item>` like
 //! Steam's client puts them, and subscribed items that aren't there yet
 //! download when the game first asks for its subscriptions.

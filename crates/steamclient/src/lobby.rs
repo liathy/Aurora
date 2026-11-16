@@ -1,9 +1,9 @@
-//! ISteamMatchmaking: Steam lobbies through SteamInRust's connection to
+//! ISteamMatchmaking: Steam lobbies through Aurora's connection to
 //! Steam's matchmaking servers (the same lobbies players on the official
 //! client see and join).
 //!
 //! The DLL keeps a cache of the lobbies the game knows about. Calls that
-//! change something go to SteamInRust over the pipe; what Steam pushes back
+//! change something go to Aurora over the pipe; what Steam pushes back
 //! (lobby data, members joining and leaving, chat) arrives through
 //! [`start_events`], a thread that long-polls the app, and turns into the
 //! callbacks a game expects (LobbyDataUpdate_t, LobbyChatUpdate_t, …).

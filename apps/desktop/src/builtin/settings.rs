@@ -87,7 +87,7 @@ impl Settings {
 
 impl Extension for Settings {
     fn manifest(&self) -> Manifest {
-        Manifest { id: "settings", name: "Settings", author: "SteamInRust", description: "Appearance, plugins, account", core: true, ..Manifest::DEFAULT }
+        Manifest { id: "settings", name: "Settings", author: "Aurora", description: "Appearance, plugins, account", core: true, ..Manifest::DEFAULT }
     }
 
     fn pages(&self) -> Vec<PageSpec> {
@@ -411,7 +411,7 @@ fn anti_cheat_headless(ui: &mut Ui, t: &Theme) {
         ui.label(w::text(icons::WARNING, 28.0, t.danger));
         ui.label(w::text_bold(t!("Play anti-cheat games at your own risk"), 20.0, t.text));
         ui.add_space(6.0);
-        ui.add(egui::Label::new(w::text(t!("This is experimental. Anti-cheat games normally start through the official Steam client; with this on, they start on SteamInRust's windowless Steam host instead."), 14.0, t.text_dim)).wrap());
+        ui.add(egui::Label::new(w::text(t!("This is experimental. Anti-cheat games normally start through the official Steam client; with this on, they start on Aurora's windowless Steam host instead."), 14.0, t.text_dim)).wrap());
         ui.add_space(10.0);
         for risk in [
             t!("The anti-cheat may see this as an unsupported setup. That can mean a kick, a game ban or a Steam (VAC) ban on your account, and bans are usually permanent."),
@@ -443,7 +443,7 @@ fn anti_cheat_headless(ui: &mut Ui, t: &Theme) {
     }
 }
 
-/// Linux: pick which Proton SteamInRust runs Windows games with.
+/// Linux: pick which Proton Aurora runs Windows games with.
 #[cfg(not(windows))]
 fn proton_version(ui: &mut Ui, t: &Theme) {
     let builds = client::proton_builds();
@@ -499,13 +499,13 @@ fn steam_download_settings(ui: &mut Ui, t: &Theme) {
             }
         }
     };
-    // SteamInRust's choice, put into Steam's settings before every game.
+    // Aurora's choice, put into Steam's settings before every game.
     let mut dl = client::gameplay_downloads();
     switch(
         ui,
         t,
         t!("Allow downloads during gameplay"),
-        t!("Let Steam update other games and download shaders while you play. Off uses less memory while a game runs. SteamInRust sets this in Steam before every game."),
+        t!("Let Steam update other games and download shaders while you play. Off uses less memory while a game runs. Aurora sets this in Steam before every game."),
         &mut dl,
     );
     if dl != client::gameplay_downloads() {
@@ -521,7 +521,7 @@ fn steam_download_settings(ui: &mut Ui, t: &Theme) {
         t!("Enable shader pre-caching"),
         t!("Download shaders already compiled for your GPU and driver, so games stutter less the first time you play."),
     );
-    // Linux: SteamInRust compiles before launch instead, and turns Steam's
+    // Linux: Aurora compiles before launch instead, and turns Steam's
     // background processing off before every game while it does.
     #[cfg(not(windows))]
     {
@@ -661,7 +661,7 @@ fn interface(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, flags: &SharedFlags, handler
             });
             ui.add_space(8.0);
         };
-        row(ui, t!("Close to tray"), t!("Keep SteamInRust running in the system tray when you close the window."), &mut f.close_to_tray);
+        row(ui, t!("Close to tray"), t!("Keep Aurora running in the system tray when you close the window."), &mut f.close_to_tray);
         row(ui, t!("Ask which account to use"), t!("Show the account picker at startup instead of signing in automatically."), &mut f.ask_account);
     });
     *flags.lock().unwrap() = f;
@@ -671,14 +671,14 @@ fn interface(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, flags: &SharedFlags, handler
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
-                ui.label(w::text_semibold(t!("Open steam:// links with SteamInRust"), 14.5, t.text));
+                ui.label(w::text_semibold(t!("Open steam:// links with Aurora"), 14.5, t.text));
                 ui.add(egui::Label::new(w::text(t!("Store buttons, desktop shortcuts and links like steam://rungameid/570 will open here. Turning it off gives them back to the official Steam client."), 12.5, t.text_dim)).wrap());
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.add(toggle(&mut on)).changed() {
                     let r = if on { crate::links::register() } else { crate::links::unregister() };
                     match r {
-                        Ok(()) => ctx.toast(if on { t!("steam:// links now open in SteamInRust") } else { t!("steam:// links handed back") }),
+                        Ok(()) => ctx.toast(if on { t!("steam:// links now open in Aurora") } else { t!("steam:// links handed back") }),
                         Err(e) => ctx.toast(e),
                     }
                     *handler = None;
@@ -707,7 +707,7 @@ fn overlay(ui: &mut Ui, t: &Theme, ctx: &mut Ctx) {
         ui.set_width(ui.available_width());
         ui.label(w::text_semibold(t!("Shift+Tab"), 15.0, t.text));
         ui.add(egui::Label::new(w::text(
-            t!("While a game you started from SteamInRust is running, press Shift+Tab to open the overlay: friends, quick chat and notes. It's a separate always-on-top window that never touches the game's process, so it's safe with anti-cheat. It shows over windowed and borderless games; exclusive fullscreen hides it."),
+            t!("While a game you started from Aurora is running, press Shift+Tab to open the overlay: friends, quick chat and notes. It's a separate always-on-top window that never touches the game's process, so it's safe with anti-cheat. It shows over windowed and borderless games; exclusive fullscreen hides it."),
             13.5,
             t.text_dim,
         )).wrap());
@@ -792,7 +792,7 @@ fn about(ui: &mut Ui, t: &Theme) {
         ui.horizontal(|ui| {
             w::logo(ui, t, 40.0);
             ui.vertical(|ui| {
-                ui.label(w::text_bold(format!("SteamInRust {}", env!("CARGO_PKG_VERSION")), 18.0, t.text));
+                ui.label(w::text_bold(format!("Aurora {}", env!("CARGO_PKG_VERSION")), 18.0, t.text));
                 ui.label(w::text(t!("A native Steam client written in Rust."), 13.5, t.text_dim));
             });
         });

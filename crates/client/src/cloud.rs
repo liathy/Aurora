@@ -485,7 +485,7 @@ async fn download(conn: &Connection, t: &Target, name: &str, path: &Path, stamp:
 
 /// Send changed files up in one batch. Returns (name, sha) of each sent file.
 async fn upload(conn: &Connection, t: &Target, files: &[(String, PathBuf, Vec<u8>)]) -> Result<Vec<(String, String)>, String> {
-    let machine = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "SteamInRust".into());
+    let machine = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "Aurora".into());
     let batch: CCloudBeginAppUploadBatchResponse = conn
         .call(
             "Cloud.BeginAppUploadBatch#1",

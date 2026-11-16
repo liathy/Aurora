@@ -594,7 +594,7 @@ impl SteamApp {
             ui.set_width(500.0);
             ui.label(ui::widgets::text_bold(i18n::tr("A download is in progress"), 19.0, t.text));
             ui.add_space(10.0);
-            let body = i18n::trf("{game} is still downloading. If you exit, it continues the next time you open SteamInRust.", &[("game", name.clone())]);
+            let body = i18n::trf("{game} is still downloading. If you exit, it continues the next time you open Aurora.", &[("game", name.clone())]);
             ui.add(egui::Label::new(ui::widgets::text(body, 14.0, t.text_dim)).wrap());
             ui.add_space(26.0);
             // Linux has no tray: the window minimizes instead.

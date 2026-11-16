@@ -1,12 +1,12 @@
 # Arch package of the release's Linux build. The Release workflow fills in
 # pkgver and the checksum and attaches the built package and this file to the
 # GitHub release; by hand: set pkgver, then `updpkgsums && makepkg -si`.
-pkgname=steamonrust-bin
+pkgname=aurora-bin
 pkgver=0.7.2
 pkgrel=1
 # The release tag; a "0.7.1-1" release is pkgver 0.7.1, pkgrel 2.
 _tag=v$pkgver
-pkgdesc="Aurora (SteamOnRust): an unofficial Steam client written in Rust"
+pkgdesc="Aurora: an unofficial Steam client written in Rust"
 arch=('x86_64')
 url="https://github.com/mollie2999/Aurora"
 license=('MIT')
@@ -17,41 +17,45 @@ depends=('glibc' 'gcc-libs' 'dbus' 'openssl-3' 'libglvnd' 'libxkbcommon' 'libxkb
 optdepends=('steam: Proton, and the windowless Steam host for Steam-DRM, native and anti-cheat games'
             'ffmpeg: store trailers'
             'libpulse: store trailer sound')
-provides=('steamonrust')
-conflicts=('steamonrust')
+provides=('aurora')
+# The package was called steamonrust-bin before the rename: pacman swaps it.
+conflicts=('aurora' 'steamonrust-bin' 'steamonrust')
+replaces=('steamonrust-bin')
 options=('!strip' '!debug')
-source=("SteamOnRust-Linux-x86_64-${_tag#v}.tar.gz::$url/releases/download/$_tag/SteamOnRust-Linux-x86_64.tar.gz")
+source=("Aurora-Linux-x86_64-${_tag#v}.tar.gz::$url/releases/download/$_tag/Aurora-Linux-x86_64.tar.gz")
 sha256sums=('SKIP')
 
 package() {
-  cd SteamOnRust-Linux-x86_64
+  cd Aurora-Linux-x86_64
 
-  # steamhost and the steamclient DLLs must sit beside steam-rs (it looks for
+  # steamhost and the steamclient DLLs must sit beside aurora (it looks for
   # them next to its own executable, symlinks resolved).
-  install -Dm755 steam-rs "$pkgdir/opt/steamonrust/steam-rs"
-  install -Dm755 steamhost "$pkgdir/opt/steamonrust/steamhost"
+  install -Dm755 aurora "$pkgdir/opt/aurora/aurora"
+  install -Dm755 steamhost "$pkgdir/opt/aurora/steamhost"
   local dll
   for dll in steamclient64.dll steamclient32.dll; do
-    if [ -f "$dll" ]; then install -Dm644 "$dll" "$pkgdir/opt/steamonrust/$dll"; fi
+    if [ -f "$dll" ]; then install -Dm644 "$dll" "$pkgdir/opt/aurora/$dll"; fi
   done
   install -d "$pkgdir/usr/bin"
-  ln -s /opt/steamonrust/steam-rs "$pkgdir/usr/bin/steamonrust"
+  ln -s /opt/aurora/aurora "$pkgdir/usr/bin/aurora"
 
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
   if [ -f icon-256.png ]; then
-    install -Dm644 icon-256.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/steamonrust.png"
+    install -Dm644 icon-256.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/aurora.png"
   fi
-  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/steamonrust.desktop" <<'EOF'
+  # StartupWMClass is the window's app id, which still names the settings
+  # folder (SteamInRust) so settings carry over.
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/aurora.desktop" <<'DESKTOP'
 [Desktop Entry]
 Type=Application
 Name=Aurora
 GenericName=Steam client
 Comment=Unofficial Steam client written in Rust
-Exec=steamonrust
-Icon=steamonrust
+Exec=aurora
+Icon=aurora
 Terminal=false
 Categories=Game;
 StartupWMClass=SteamInRust
-EOF
+DESKTOP
 }

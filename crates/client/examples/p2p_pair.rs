@@ -3,7 +3,7 @@
 //!
 //! `cargo run -p client --example p2p_pair -- <probe.exe> <steamclient.dll>`
 //!
-//! Plays SteamInRust for two made-up players: answers each game's Hello and
+//! Plays Aurora for two made-up players: answers each game's Hello and
 //! relays their P2P signalling like Steam would. The probes (the steamclient
 //! crate's `probe` example in `--direct` mode) load the DLL themselves, so
 //! nothing in the registry changes. Data goes over real UDP between them.

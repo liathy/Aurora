@@ -290,7 +290,7 @@ fn direct(dll: &str, host: bool, peer: u64) -> ! {
 }
 
 /// `--direct <steamclient.dll> --test ugc`: Workshop through our DLL against
-/// a signed-in SteamInRust (the client crate's `steamclient_attach`
+/// a signed-in Aurora (the client crate's `steamclient_attach`
 /// example). Read-only on the account: queries, the subscription list, and
 /// one item downloaded into the game's Workshop folder.
 fn ugc_test(dll: &str) -> ! {
@@ -669,7 +669,7 @@ fn input_test(dll: &str) -> ! {
 }
 
 /// `--direct <steamclient.dll> --test cert`: our DLL asks Steam (through a
-/// signed-in SteamInRust) for a networking certificate; see the DLL log.
+/// signed-in Aurora) for a networking certificate; see the DLL log.
 fn cert_test(dll: &str) -> ! {
     let w: Vec<u16> = dll.encode_utf16().chain([0]).collect();
     let module = unsafe { LoadLibraryW(w.as_ptr()) };

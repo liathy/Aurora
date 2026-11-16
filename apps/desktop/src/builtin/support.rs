@@ -23,7 +23,7 @@ pub struct Support {
 
 impl Extension for Support {
     fn manifest(&self) -> Manifest {
-        Manifest { id: "support", name: "Support", author: "SteamInRust", description: "Steam Support", core: true, ..Manifest::DEFAULT }
+        Manifest { id: "support", name: "Support", author: "Aurora", description: "Steam Support", core: true, ..Manifest::DEFAULT }
     }
 
     fn pages(&self) -> Vec<PageSpec> {

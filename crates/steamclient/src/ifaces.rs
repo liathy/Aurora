@@ -2,7 +2,7 @@
 //!
 //! Each function matches the C++ method it stands in for: `this` first, then
 //! the method's arguments; methods returning a class take a hidden return
-//! pointer right after `this`. Data comes from the session SteamInRust sent
+//! pointer right after `this`. Data comes from the session Aurora sent
 //! at start-up; slow things (storing stats, other players' stats) run on a
 //! thread and finish as Steam API call results.
 
@@ -216,7 +216,7 @@ extern "C" fn empty_str() -> *const c_char {
 extern "C" fn logged_on(_t: This) -> bool {
     lock().session.as_ref().is_some_and(|s| !s.offline)
 }
-/// A SteamInRust session exists (online or offline).
+/// A Aurora session exists (online or offline).
 extern "C" fn has_session(_t: This) -> bool {
     lock().session.is_some()
 }
@@ -587,7 +587,7 @@ extern "C" fn fr_has_friend(_t: This, id: u64, flags: i32) -> bool {
 extern "C" fn fr_overlay_web(_t: This, url: *const c_char, _mode: i32) {
     crate::win::open_url(&unsafe { text(url) });
 }
-/// Ask SteamInRust to open its overlay on a dialog (without blocking the game).
+/// Ask Aurora to open its overlay on a dialog (without blocking the game).
 fn overlay(dialog: String, target: String) {
     crate::log!("overlay: {dialog} {target}");
     std::thread::spawn(move || {
@@ -1030,7 +1030,7 @@ extern "C" fn st_global_stats(_t: This, _days: i32) -> u64 {
 // ---------------------------------------------------- ISteamRemoteStorage
 
 /// `<Steam>/userdata/<account>/<app>/remote`: where Steam keeps a game's
-/// cloud files; SteamInRust syncs this folder before and after playing.
+/// cloud files; Aurora syncs this folder before and after playing.
 fn remote_dir() -> Option<PathBuf> {
     user_dir().map(|d| d.join("remote"))
 }

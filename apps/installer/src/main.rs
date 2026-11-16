@@ -1,6 +1,6 @@
-//! SteamInRust Setup, laid out like Steam's own installer (a classic Windows
+//! Aurora Setup, laid out like Steam's own installer (a classic Windows
 //! setup wizard): Welcome → Language → Install location → Installing (with
-//! "Show details") → Finish ("Run SteamInRust"). The same program uninstalls
+//! "Show details") → Finish ("Run Aurora"). The same program uninstalls
 //! (`--uninstall`) and applies updates (`--update --dir <folder>`) in a small
 //! dark window like Steam's "Updating Steam…".
 
@@ -65,7 +65,7 @@ fn main() -> eframe::Result {
     let options = eframe::NativeOptions { viewport, centered: true, persist_window: false, ..Default::default() };
     let progress = Arc::new(Mutex::new(Progress::default()));
     ui::native::run(
-        "SteamInRust Setup",
+        "Aurora Setup",
         options,
         Box::new(move |cc| {
             wizard::fonts(&cc.egui_ctx);

@@ -2,7 +2,7 @@
 //! pads. The pads are read through XInput; which button does which action
 //! comes from the game's Steam Input bindings (a controller_mappings VDF:
 //! the player's configuration, the one the game ships, or the game's
-//! official one), which SteamInRust finds like Steam's client does.
+//! official one), which Aurora finds like Steam's client does.
 //!
 //! Without bindings no controller is reported, so the game uses its own
 //! controller support, as it would without Steam Input. Gyro, trackpads,
@@ -363,7 +363,7 @@ fn st() -> MutexGuard<'static, Input> {
     I.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// Ask SteamInRust for the bindings once (in the background).
+/// Ask Aurora for the bindings once (in the background).
 fn load() {
     {
         let mut s = st();

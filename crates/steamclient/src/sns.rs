@@ -4,7 +4,7 @@
 //! Connections to other players speak Valve's own protocol ([`crate::gns`]):
 //! a Valve-signed certificate, ConnectRequest / ConnectOK in rendezvous
 //! signals through Steam, then encrypted SNP packets over ICE. So players
-//! on Valve's official client and SteamInRust players can connect to each
+//! on Valve's official client and Aurora players can connect to each
 //! other either way.
 //!
 //! Connecting to yourself (a host joining its own game) and socket pairs
@@ -1131,7 +1131,7 @@ extern "C" fn s_listen_ip(_t: This, _addr: *const u8, n: i32, options: *const u8
 
 extern "C" fn s_connect_ip(_t: This, _addr: *const u8, n: i32, options: *const u8) -> u32 {
     crate::log!("sns: connect by IP isn't possible");
-    with(|net| net.connect_unsupported(option_callback(n, options), "connecting by IP address needs Valve's UDP connect protocol; SteamInRust connects players over P2P only"))
+    with(|net| net.connect_unsupported(option_callback(n, options), "connecting by IP address needs Valve's UDP connect protocol; Aurora connects players over P2P only"))
 }
 
 extern "C" fn s_listen_p2p(_t: This, vport: i32, n: i32, options: *const u8) -> u32 {
@@ -1262,7 +1262,7 @@ extern "C" fn s_detailed(_t: This, h: u32, buf: *mut c_char, len: i32) -> i32 {
     let n = net();
     let Some(c) = n.conns.get(&h) else { return -1 };
     let route = c.proto.as_ref().and_then(|p| p.remote_addr()).map(|a| a.to_string()).unwrap_or_else(|| "none".into());
-    let text = format!("SteamInRust P2P to {} (state {}, ping {} ms, route {route})
+    let text = format!("Aurora P2P to {} (state {}, ping {} ms, route {route})
 ", c.peer, c.state, n.ping(h));
     if buf.is_null() || (len as usize) < text.len() + 1 {
         return text.len() as i32 + 1;

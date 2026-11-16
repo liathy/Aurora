@@ -126,7 +126,7 @@ impl Default for Device {
     fn default() -> Self {
         let name = std::env::var("COMPUTERNAME")
             .or_else(|_| std::env::var("HOSTNAME"))
-            .unwrap_or_else(|_| "SteamInRust".into());
+            .unwrap_or_else(|_| "Aurora".into());
         Self { name }
     }
 }

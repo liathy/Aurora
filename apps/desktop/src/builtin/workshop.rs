@@ -70,7 +70,7 @@ impl Workshop {
 
 impl Extension for Workshop {
     fn manifest(&self) -> Manifest {
-        Manifest { id: "workshop", name: "Workshop", author: "SteamInRust", description: "Steam Workshop browser", core: true, ..Manifest::DEFAULT }
+        Manifest { id: "workshop", name: "Workshop", author: "Aurora", description: "Steam Workshop browser", core: true, ..Manifest::DEFAULT }
     }
 
     fn pages(&self) -> Vec<PageSpec> {

@@ -1,5 +1,5 @@
 //! ISteamInventory: the player's items for this game and its item
-//! definitions, from Steam's Inventory service through SteamInRust. Drops,
+//! definitions, from Steam's Inventory service through Aurora. Drops,
 //! promo items, consuming, crafting (ExchangeItems), stack moves and
 //! property updates go to Steam when the game asks for them.
 //!

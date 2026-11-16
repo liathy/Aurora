@@ -98,6 +98,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: SteamInRust-preview-${{ github.sha }}
+          name: Aurora-preview-${{ github.sha }}
           path: target/package/dist/*
           retention-days: 14

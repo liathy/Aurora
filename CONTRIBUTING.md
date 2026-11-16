@@ -1,4 +1,4 @@
-# Contributing to SteamInRust
+# Contributing to Aurora
 
 Thanks for helping! A few things keep the project easy to work on.
 

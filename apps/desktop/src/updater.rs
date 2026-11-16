@@ -233,7 +233,7 @@ fn block_on<T>(f: impl std::future::Future<Output = T>) -> T {
 }
 
 fn http() -> reqwest::Client {
-    reqwest::Client::builder().user_agent(concat!("SteamInRust/", env!("CARGO_PKG_VERSION"), " (updater)")).timeout(Duration::from_secs(60)).build().unwrap_or_default()
+    reqwest::Client::builder().user_agent(concat!("Aurora/", env!("CARGO_PKG_VERSION"), " (updater)")).timeout(Duration::from_secs(60)).build().unwrap_or_default()
 }
 
 #[derive(Deserialize)]
@@ -265,7 +265,9 @@ async fn latest() -> Result<Option<Release>, String> {
     if rel.draft || rel.prerelease {
         return Ok(None);
     }
-    let Some(setup) = rel.assets.iter().find(|a| a.name.starts_with("SteamInRust-Setup") && a.name.ends_with(".exe")) else { return Ok(None) };
+    // "SteamInRust-Setup…" is the same setup under its name from before the rename.
+    let setup_named = |prefix: &str| rel.assets.iter().find(|a| a.name.starts_with(prefix) && a.name.ends_with(".exe"));
+    let Some(setup) = setup_named("Aurora-Setup").or_else(|| setup_named("SteamInRust-Setup")) else { return Ok(None) };
     Ok(Some(Release {
         version: rel.tag_name.trim_start_matches('v').to_string(),
         notes: rel.body.unwrap_or_default(),
@@ -300,7 +302,7 @@ async fn fetch_setup(r: &Release, progress: impl Fn(f32)) -> Result<PathBuf, Str
     if got != want {
         return Err(t!("The download was damaged (checksum mismatch). Try again later.").to_string());
     }
-    let dir = std::env::temp_dir().join("SteamInRust-update");
+    let dir = std::env::temp_dir().join("Aurora-update");
     let _ = std::fs::create_dir_all(&dir);
     let path = dir.join(&r.setup_name);
     std::fs::write(&path, &data).map_err(|e| e.to_string())?;
@@ -333,12 +335,12 @@ fn window(app: &mut SteamApp, ctx: &egui::Context) {
                 ui.set_width(360.0);
                 ui.horizontal(|ui| {
                     w::logo(ui, &t, 28.0);
-                    ui.label(w::text_bold(t!("SteamInRust update"), 16.0, t.text));
+                    ui.label(w::text_bold(t!("Aurora update"), 16.0, t.text));
                 });
                 ui.add_space(10.0);
                 let text = match &status {
                     Status::Checking => t!("Checking for updates…").to_string(),
-                    Status::UpToDate => t!("Your SteamInRust client is already up to date ({v}).", v = env!("CARGO_PKG_VERSION")),
+                    Status::UpToDate => t!("Your Aurora client is already up to date ({v}).", v = env!("CARGO_PKG_VERSION")),
                     Status::Failed(e) => t!("Couldn't check for updates: {error}", error = e),
                     _ => String::new(),
                 };
@@ -366,7 +368,7 @@ fn window(app: &mut SteamApp, ctx: &egui::Context) {
         ui.horizontal(|ui| {
             w::logo(ui, &t, 34.0);
             ui.vertical(|ui| {
-                ui.label(w::text_bold(t!("SteamInRust {v} is available", v = release.version), 17.0, t.text));
+                ui.label(w::text_bold(t!("Aurora {v} is available", v = release.version), 17.0, t.text));
                 ui.label(w::text(t!("You have {v}", v = env!("CARGO_PKG_VERSION")), 12.5, t.text_dim));
             });
         });
@@ -404,7 +406,7 @@ fn window(app: &mut SteamApp, ctx: &egui::Context) {
                             restart_to_update(app, ctx, setup);
                             close = true;
                         }
-                        if w::button(ui, &t, None, t!("On next start"), w::Kind::Ghost, w::Size::Md).on_hover_text(t!("It installs the next time you open SteamInRust")).clicked() {
+                        if w::button(ui, &t, None, t!("On next start"), w::Kind::Ghost, w::Size::Md).on_hover_text(t!("It installs the next time you open Aurora")).clicked() {
                             close = true;
                         }
                     }

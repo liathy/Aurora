@@ -74,7 +74,7 @@ impl ImageCache {
         let dir = dir();
         let _ = std::fs::create_dir_all(&dir);
         let http = reqwest::Client::builder()
-            .user_agent(concat!("SteamInRust/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("Aurora/", env!("CARGO_PKG_VERSION")))
             .timeout(Duration::from_secs(30))
             .build()
             .unwrap_or_default();

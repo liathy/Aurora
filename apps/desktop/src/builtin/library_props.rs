@@ -326,9 +326,9 @@ impl Library {
         };
         if !langs.is_empty() {
             section(ui, t, t!("Language"), t!("Which language to download for this game."), |ui| {
-                let current = if s.language.is_empty() { t!("Same as SteamInRust").to_string() } else { s.language.clone() };
+                let current = if s.language.is_empty() { t!("Same as Aurora").to_string() } else { s.language.clone() };
                 egui::ComboBox::from_id_salt(("game-lang", app)).selected_text(current).width(240.0).show_ui(ui, |ui| {
-                    ui.selectable_value(&mut s.language, String::new(), t!("Same as SteamInRust"));
+                    ui.selectable_value(&mut s.language, String::new(), t!("Same as Aurora"));
                     for l in &langs {
                         ui.selectable_value(&mut s.language, l.clone(), l);
                     }

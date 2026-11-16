@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/media/ru/banner.png" alt="SteamInRust: клиент Steam, переписанный на Rust" width="100%">
+  <img src="docs/media/ru/banner.png" alt="Aurora: клиент Steam, переписанный на Rust" width="100%">
 </p>
 
 <p align="center">
@@ -12,13 +12,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/madonchik123/SteamInRust/releases/latest"><img alt="Релиз" src="https://img.shields.io/github/v/release/madonchik123/SteamInRust?style=flat-square&color=4F8CFF"></a>
-  <a href="https://github.com/madonchik123/SteamInRust/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/madonchik123/SteamInRust/ci.yml?branch=main&style=flat-square&label=CI"></a>
+  <a href="https://github.com/madonchik123/Aurora/releases/latest"><img alt="Релиз" src="https://img.shields.io/github/v/release/madonchik123/Aurora?style=flat-square&color=4F8CFF"></a>
+  <a href="https://github.com/madonchik123/Aurora/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/madonchik123/Aurora/ci.yml?branch=main&style=flat-square&label=CI"></a>
   <img alt="Windows 10 и 11" src="https://img.shields.io/badge/Windows%2010%20%C2%B7%2011-4F8CFF?style=flat-square">
   <img alt="Лицензия MIT" src="https://img.shields.io/badge/license-MIT-2FB36B?style=flat-square">
 </p>
 
-# SteamInRust
+# Aurora
 
 **Десктопный клиент Steam, переписанный на Rust.** Магазин, библиотека,
 загрузки, друзья, чат, инвентарь, Торговая площадка, Steam Cloud и оверлей по
@@ -27,12 +27,12 @@ Shift+Tab в одном нативном процессе без встроен�
 кодом (MIT), неофициальный.
 
 Официальный клиент сделан на Chromium: десяток процессов `steamwebhelper.exe`
-рисуют веб-страницы. SteamInRust рисует всё сам на видеокарте с помощью
+рисуют веб-страницы. Aurora рисует всё сам на видеокарте с помощью
 [egui](https://github.com/emilk/egui), поэтому запускается примерно за две
 секунды и в простое занимает около четверти гигабайта.
 
 <p align="center">
-  <img src="docs/media/ru/store.png" alt="Страница игры Hades в магазине SteamInRust с трейлером" width="100%">
+  <img src="docs/media/ru/store.png" alt="Страница игры Hades в магазине Aurora с трейлером" width="100%">
 </p>
 
 ## Что уже работает
@@ -43,7 +43,7 @@ Shift+Tab в одном нативном процессе без встроен�
 - **Магазин.** Главная, поиск, метки с фильтрами, список желаемого и корзина.
   Трейлеры на страницах игр играют прямо в приложении. Цены показаны в валюте
   вашего кошелька, игры, которые у вас уже есть, отмечены. Игру можно подарить,
-  даже если она у вас есть, и SteamInRust заранее проверит, доставит ли Steam
+  даже если она у вас есть, и Aurora заранее проверит, доставит ли Steam
   подарок в регион друга. Оплата проходит на сайте Steam, так требует Steam.
 - **Библиотека.** Все ваши игры, коллекции (вместе с «Избранным» и «Скрытым»
   из Steam), сторонние игры, фильтры, достижения и полные свойства игры:
@@ -68,7 +68,7 @@ Shift+Tab в одном нативном процессе без встроен�
   локальными копиями, сохранения из офлайна выгружаются, когда сеть вернётся.
 - **Игры.** Игры без античита получают достижения, статистику, облачные
   сохранения, лобби, P2P, Мастерскую, инвентарь, браузер серверов, скриншоты и
-  Steam Input от собственного `steamclient` SteamInRust, включая 32-битные
+  Steam Input от собственного `steamclient` Aurora, включая 32-битные
   игры. Старые сетевые игры (например, Human Fall Flat) играют с друзьями и
   незнакомцами из официального клиента. Игры с VAC, Easy Anti-Cheat или BattlEye всегда запускаются
   через официальный клиент, незаметно, чтобы античит работал как задумано
@@ -77,7 +77,7 @@ Shift+Tab в одном нативном процессе без встроен�
   достижения, руководства и заметки. Как и в Steam, он рисуется внутри игры
   (игры на D3D11), поэтому работает и в полноэкранном режиме. Любое окно можно
   закрепить поверх игры.
-- **Офлайн-режим.** Работает как в Steam. Если связь пропала, SteamInRust
+- **Офлайн-режим.** Работает как в Steam. Если связь пропала, Aurora
   переподключается, не выходя из аккаунта, и запущенные игры продолжают работать.
 - **Плагины.** Небольшие скрипты на [Rhai](https://rhai.rs) добавляют страницы,
   уведомления и автоматизацию, только с теми разрешениями, которые вы дали.
@@ -90,7 +90,7 @@ Shift+Tab в одном нативном процессе без встроен�
   </tr>
   <tr>
     <td width="50%"><img src="docs/media/ru/profile.png" alt="Профиль: уровень, недавняя активность, комментарии"></td>
-    <td width="50%"><img src="docs/media/ru/startup-race.gif" alt="SteamInRust и Steam запускаются рядом"></td>
+    <td width="50%"><img src="docs/media/ru/startup-race.gif" alt="Aurora и Steam запускаются рядом"></td>
   </tr>
 </table>
 
@@ -98,13 +98,13 @@ Shift+Tab в одном нативном процессе без встроен�
 
 ## Производительность
 
-**SteamInRust открывает окно примерно в 4 раза быстрее Steam и занимает
+**Aurora открывает окно примерно в 4 раза быстрее Steam и занимает
 меньше четверти памяти** на том же ПК, с тем же аккаунтом и сетью. Замерено
-8 ноября 2026 года на Ryzen 5 5600 с 16 ГБ памяти, Windows 11: SteamInRust
+8 ноября 2026 года на Ryzen 5 5600 с 16 ГБ памяти, Windows 11: Aurora
 0.4.0 против Steam 11.15.70.27. Оба клиента открывались на библиотеке. Каждое
 число — типичный результат из 5 запусков:
 
-| | Steam | SteamInRust |
+| | Steam | Aurora |
 | --- | ---: | ---: |
 | Запуск → главное окно | 9,4 с | 2,4 с |
 | Запуск → библиотека полностью отрисована | 19,2 с | 10,0 с |
@@ -116,21 +116,21 @@ Shift+Tab в одном нативном процессе без встроен�
 | Открыть страницу игры в библиотеке | 0,85 с | 0,06 с |
 | Открыть «Друзья и чат» | 1,32 с | 0,05 с |
 
-Большая часть времени до полностью отрисованной библиотеки у SteamInRust
+Большая часть времени до полностью отрисованной библиотеки у Aurora
 уходит на загрузку обложек из сети. Когда обложки уже в кеше на диске (тёплый
 запуск), получилось 7,2 с. Сам список игр появляется примерно через 1 с после
-запуска: SteamInRust показывает библиотеку с прошлого входа, пока Steam
+запуска: Aurora показывает библиотеку с прошлого входа, пока Steam
 присылает актуальную. Методика, разброс и что не учитывалось:
 [docs/benchmarks.md](docs/benchmarks.md) (на английском).
 
 ## Скачать
 
-Берите в [последнем релизе](https://github.com/madonchik123/SteamInRust/releases/latest):
+Берите в [последнем релизе](https://github.com/madonchik123/Aurora/releases/latest):
 
 | Файл | Что это |
 | --- | --- |
-| `SteamInRust-Setup-<версия>.exe` | Установщик. Ставит только для вашего пользователя, без прав администратора, в `%LOCALAPPDATA%\Programs\SteamInRust`, и обновляется сам |
-| `SteamInRust-<версия>-portable.zip` | То же приложение без установщика. Само не обновляется |
+| `Aurora-Setup-<версия>.exe` | Установщик. Ставит только для вашего пользователя, без прав администратора, в `%LOCALAPPDATA%\Programs\Aurora`, и обновляется сам |
+| `Aurora-<версия>-portable.zip` | То же приложение без установщика. Само не обновляется |
 | `SHA256SUMS.txt` | Контрольные суммы обоих файлов |
 
 Нужны Windows 10 или 11 (64-бит) и аккаунт Steam. Войти можно паролем со Steam
@@ -140,16 +140,16 @@ Guard или по QR-коду из мобильного приложения Ste
 
 ## Это безопасно?
 
-- **Аккаунт.** SteamInRust входит так же, как официальный клиент и мобильное
+- **Аккаунт.** Aurora входит так же, как официальный клиент и мобильное
   приложение Steam. Данные входа хранятся только на вашем ПК, в папке данных
   приложения вашего пользователя, и отправляются только в Steam.
-- **Античиты.** SteamInRust никогда не трогает античиты. Игры с ними всегда
+- **Античиты.** Aurora никогда не трогает античиты. Игры с ними всегда
   запускаются через клиент Valve.
 - **Другие соединения.** Кроме Steam, приложение обращается только к GitHub
   (за обновлениями) и к сервису курсов валют (когда вы проверяете регион
   подарка). Если вы добавите свой ключ, ещё к IsThereAnyDeal (история цен).
   Телеметрии нет.
-- **Неофициальный.** SteamInRust не сделан и не одобрен Valve.
+- **Неофициальный.** Aurora не сделан и не одобрен Valve.
 
 ## Плагины
 
@@ -189,8 +189,8 @@ fn page() {
 (см. `rust-toolchain.toml`).
 
 ```sh
-git clone https://github.com/madonchik123/SteamInRust.git
-cd SteamInRust
+git clone https://github.com/madonchik123/Aurora.git
+cd Aurora
 cargo run                  # вход в ваш аккаунт
 cargo run -- --demo        # тестовые данные, без входа
 cargo test --workspace
@@ -261,4 +261,4 @@ Conventional Commits (`feat: …`, `fix: …`): из них собираются
 ## Лицензия
 
 [MIT](LICENSE). Steam и логотип Steam — товарные знаки Valve Corporation.
-SteamInRust не связан с Valve и не одобрен ею.
+Aurora не связан с Valve и не одобрен ею.

@@ -1,6 +1,6 @@
 # Releases happen when the version goes up: bump `version` in Cargo.toml and
 # push to main. If there is no tag vX.Y.Z for that version yet, this builds
-#   - Linux: SteamOnRust-Linux-x86_64.tar.gz (+ .sha256)
+#   - Linux: Aurora-Linux-x86_64.tar.gz (+ .sha256)
 #   - Windows: the setup, a portable zip and SHA256SUMS.txt (the app's
 #     updater checks it)
 # in parallel, then tags the commit vX.Y.Z and publishes the release (with
@@ -96,14 +96,14 @@ jobs:
         run: cargo test --release --locked -p i18n -p ui -p vdf -p model -p store
 
       - name: Build
-        run: cargo build --release --locked -p steam-rs -p steamhost
+        run: cargo build --release --locked -p aurora -p steamhost
 
       # Ubuntu 22.04 has glibc 2.35, so the binaries also start on older
       # distros (Ubuntu 22.04, Mint 21, Debian 12). Fail if one needs newer.
       - name: Check the glibc the binaries need
         run: |
           max=2.35
-          for f in target/release/steam-rs target/release/steamhost; do
+          for f in target/release/aurora target/release/steamhost; do
             need=$(objdump -T "$f" | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -uV | tail -n1)
             echo "$f needs glibc $need"
             if [ "$(printf '%s\n%s\n' "$need" "$max" | sort -V | tail -n1)" != "$max" ]; then
@@ -113,9 +113,9 @@ jobs:
 
       - name: Package
         run: |
-          name=SteamOnRust-Linux-x86_64
+          name=Aurora-Linux-x86_64
           mkdir -p dist/$name
-          cp target/release/steam-rs target/release/steamhost README.md LICENSE assets/icon-256.png dist/$name/
+          cp target/release/aurora target/release/steamhost README.md LICENSE assets/icon-256.png dist/$name/
           tar -C dist -czf dist/$name.tar.gz $name
           (cd dist && sha256sum $name.tar.gz > $name.tar.gz.sha256)
 
@@ -192,7 +192,7 @@ jobs:
       - name: Add the steamclient DLLs to the Linux archive
         if: needs.windows.result == 'success'
         run: |
-          name=SteamOnRust-Linux-x86_64
+          name=Aurora-Linux-x86_64
           mkdir -p work && tar -C work -xzf dist/$name.tar.gz
           unzip -j -o dist/*-portable.zip steamclient.dll steamclient32.dll -d dlls
           cp dlls/steamclient.dll work/$name/steamclient64.dll
@@ -217,13 +217,13 @@ jobs:
             *-*) pkgver=${VERSION%-*}; pkgrel=$(( ${VERSION##*-} + 1 ));;
             *) pkgver=$VERSION; pkgrel=1;;
           esac
-          name=SteamOnRust-Linux-x86_64
+          name=Aurora-Linux-x86_64
           mkdir -p arch
           cp repo/packaging/arch/PKGBUILD arch/
           cp dist/$name.tar.gz arch/$name-$VERSION.tar.gz
           sum=$(cut -d' ' -f1 dist/$name.tar.gz.sha256)
           sed -i -e "s/^pkgver=.*/pkgver=$pkgver/" -e "s/^pkgrel=.*/pkgrel=$pkgrel/" -e "s/^_tag=.*/_tag=v$VERSION/" -e "s/^sha256sums=.*/sha256sums=('$sum')/" arch/PKGBUILD
-          echo "pkg=steamonrust-bin-$pkgver-$pkgrel-x86_64.pkg.tar.zst" >> "$GITHUB_OUTPUT"
+          echo "pkg=aurora-bin-$pkgver-$pkgrel-x86_64.pkg.tar.zst" >> "$GITHUB_OUTPUT"
           docker run --rm -v "$PWD/arch:/pkg" archlinux:base-devel bash -c \
             'useradd -m build && chown -R build /pkg && cd /pkg && su build -c "makepkg --nodeps --noconfirm"'
           cp arch/*.pkg.tar.zst dist/
@@ -252,11 +252,11 @@ jobs:
               cat changes.md
               echo
             fi
-            echo "**Linux (x86_64):** download \`SteamOnRust-Linux-x86_64.tar.gz\`, then:"
+            echo "**Linux (x86_64):** download \`Aurora-Linux-x86_64.tar.gz\`, then:"
             echo
             echo '```sh'
-            echo 'tar -xzf SteamOnRust-Linux-x86_64.tar.gz'
-            echo './SteamOnRust-Linux-x86_64/steam-rs'
+            echo 'tar -xzf Aurora-Linux-x86_64.tar.gz'
+            echo './Aurora-Linux-x86_64/aurora'
             echo '```'
             echo
             if [ "$ARCH" = "success" ]; then
@@ -266,11 +266,11 @@ jobs:
               echo "sudo pacman -U $ARCH_PKG"
               echo '```'
               echo
-              echo "It installs to \`/opt/steamonrust\` with an **Aurora** menu entry and the \`steamonrust\` command. The \`PKGBUILD\` is attached too."
+              echo "It installs to \`/opt/aurora\` with an **Aurora** menu entry and the \`aurora\` command. The \`PKGBUILD\` is attached too."
               echo
             fi
             if [ "$WINDOWS" = "success" ]; then
-              echo "**Windows:** run \`SteamInRust-Setup-$VERSION.exe\`, or unzip the portable zip."
+              echo "**Windows:** run \`Aurora-Setup-$VERSION.exe\`, or unzip the portable zip."
             else
               echo "_No Windows build this time (it failed in CI)._"
             fi
