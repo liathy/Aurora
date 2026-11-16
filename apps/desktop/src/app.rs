@@ -284,7 +284,7 @@ impl SteamApp {
             window_mode: None,
             center_window: None,
             pending_size: None,
-            tray: crate::tray::Tray::new(&cc.egui_ctx),
+            tray: crate::tray::Tray::new(cc),
             flags,
             friends_window: Default::default(),
             links: crate::links::listen(cc.egui_ctx.clone()),
@@ -496,11 +496,12 @@ impl SteamApp {
         ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
     }
 
-    /// Hide the main window in the tray. Linux has no usable tray icon to
-    /// bring it back (tray-icon there needs a GTK loop and sends no clicks),
-    /// so it only minimizes and keeps drawing.
+    /// Hide the main window in the tray. A Wayland window can't be hidden
+    /// (winit has no way to unmap it), so there it is minimized and the tray
+    /// raises it again with an activation token. Without a tray icon nothing
+    /// could bring a hidden window back, so it only minimizes too.
     fn hide_to_tray(&mut self, ctx: &egui::Context) {
-        if cfg!(windows) {
+        if self.tray.available() && !self.tray.wayland() {
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
             self.hidden = true;
         } else {
@@ -597,8 +598,8 @@ impl SteamApp {
             let body = i18n::trf("{game} is still downloading. If you exit, it continues the next time you open SteamInRust.", &[("game", name.clone())]);
             ui.add(egui::Label::new(ui::widgets::text(body, 14.0, t.text_dim)).wrap());
             ui.add_space(26.0);
-            // Linux has no tray: the window minimizes instead.
-            let keep = if cfg!(windows) { i18n::tr("Keep downloading in the tray") } else { i18n::tr("Minimize and keep downloading") };
+            // No tray icon: the window minimizes instead.
+            let keep = if self.tray.available() { i18n::tr("Keep downloading in the tray") } else { i18n::tr("Minimize and keep downloading") };
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
                 exit = ui::widgets::button(ui, &t, Some(ui::icons::POWER), i18n::tr("Exit anyway"), ui::widgets::Kind::Danger, ui::widgets::Size::Md).clicked();
@@ -688,9 +689,9 @@ impl eframe::App for SteamApp {
         self.handle_links(&ctx, &mut actions);
 
         // Closing the window hides it in the tray (like Steam) unless "Exit" was chosen.
-        // Linux has no tray icon, so closing quits there.
+        // With no tray icon (e.g. GNOME without the AppIndicator extension), closing quits.
         let signed_in_now = self.state.phase == Phase::LoggedIn;
-        if cfg!(windows) && ctx.input(|i| i.viewport().close_requested()) && self.prefs.close_to_tray && signed_in_now && !self.exiting {
+        if self.tray.available() && ctx.input(|i| i.viewport().close_requested()) && self.prefs.close_to_tray && signed_in_now && !self.exiting {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             self.hide_to_tray(&ctx);
         } else if ctx.input(|i| i.viewport().close_requested()) && !self.exiting && self.downloading() {

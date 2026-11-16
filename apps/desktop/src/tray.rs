@@ -1,5 +1,7 @@
-//! System tray icon. Right-click opens our own menu window (styled like the
-//! app) instead of the plain Windows menu.
+//! System tray icon. On Windows, right-click opens our own menu window
+//! (styled like the app) instead of the plain Windows menu. On Linux the icon
+//! is a StatusNotifierItem with the desktop's own menu (tray_linux.rs): a
+//! menu window can't be placed at the cursor on Wayland.
 //!
 //! The menu window is created once and then kept alive hidden, so it opens
 //! instantly; it repaints on its own (it doesn't wait for the main window),
@@ -11,13 +13,15 @@ use egui::{Align2, Color32, CornerRadius, Pos2, Sense, Stroke, Ui, Vec2, Viewpor
 use i18n::t;
 use model::{Persona, PersonaState};
 use std::sync::{Arc, Mutex, mpsc};
+#[cfg(windows)]
 use tray_icon::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use ui::{Theme, icons, widgets as w};
 
 #[derive(Debug, Clone, Copy)]
 pub enum TrayCmd {
     Show,
-    /// Right-click at this screen position (physical pixels).
+    /// Right-click at this screen position (physical pixels; Windows only).
+    #[cfg_attr(not(windows), allow(dead_code))]
     Menu(f64, f64),
     Page(&'static str),
     Friends,
@@ -52,7 +56,12 @@ struct MenuState {
 }
 
 pub struct Tray {
+    #[cfg(windows)]
     _icon: Option<TrayIcon>,
+    #[cfg(target_os = "linux")]
+    linux: Option<crate::tray_linux::LinuxTray>,
+    /// The main window is a Wayland window (it can't be hidden, only minimized).
+    wayland: bool,
     rx: mpsc::Receiver<TrayCmd>,
     tx: Arc<Mutex<mpsc::Sender<TrayCmd>>>,
     menu: Arc<Mutex<MenuState>>,
@@ -61,35 +70,75 @@ pub struct Tray {
 }
 
 impl Tray {
-    pub fn new(ctx: &egui::Context) -> Self {
+    pub fn new(cc: &eframe::CreationContext) -> Self {
+        let ctx = &cc.egui_ctx;
         let (tx, rx) = mpsc::channel();
-        // On Linux tray-icon panics without a running GTK loop and never
-        // reports clicks, so there is no tray icon there.
-        let icon = cfg!(windows)
-            .then(|| {
-                TrayIconBuilder::new()
-                    .with_tooltip("SteamInRust")
-                    .with_icon(tray_icon::Icon::from_rgba(ui::brand::icon_rgba(32), 32, 32).expect("valid icon"))
-                    .build()
-                    .map_err(|e| tracing::warn!("tray icon unavailable: {e}"))
-                    .ok()
-            })
-            .flatten();
-        let (events_tx, repaint) = (tx.clone(), ctx.clone());
-        TrayIconEvent::set_event_handler(Some(move |e: TrayIconEvent| {
-            let cmd = match e {
-                TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } => Some(TrayCmd::Show),
-                TrayIconEvent::DoubleClick { button: MouseButton::Left, .. } => Some(TrayCmd::Show),
-                TrayIconEvent::Click { button: MouseButton::Right, button_state: MouseButtonState::Up, position, .. } => Some(TrayCmd::Menu(position.x, position.y)),
-                _ => None,
-            };
-            if let Some(cmd) = cmd {
-                let _ = events_tx.send(cmd);
-                repaint.request_repaint();
-            }
-        }));
+        #[cfg(windows)]
+        let icon = {
+            let icon = TrayIconBuilder::new()
+                .with_tooltip(i18n::BRAND)
+                .with_icon(tray_icon::Icon::from_rgba(ui::brand::icon_rgba(32), 32, 32).expect("valid icon"))
+                .build()
+                .map_err(|e| tracing::warn!("tray icon unavailable: {e}"))
+                .ok();
+            let (events_tx, repaint) = (tx.clone(), ctx.clone());
+            TrayIconEvent::set_event_handler(Some(move |e: TrayIconEvent| {
+                let cmd = match e {
+                    TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } => Some(TrayCmd::Show),
+                    TrayIconEvent::DoubleClick { button: MouseButton::Left, .. } => Some(TrayCmd::Show),
+                    TrayIconEvent::Click { button: MouseButton::Right, button_state: MouseButtonState::Up, position, .. } => Some(TrayCmd::Menu(position.x, position.y)),
+                    _ => None,
+                };
+                if let Some(cmd) = cmd {
+                    let _ = events_tx.send(cmd);
+                    repaint.request_repaint();
+                }
+            }));
+            icon
+        };
+        #[cfg(target_os = "linux")]
+        let (linux, wayland) = {
+            use raw_window_handle::{HasDisplayHandle, RawDisplayHandle};
+            let wayland = cc.display_handle().is_ok_and(|d| matches!(d.as_raw(), RawDisplayHandle::Wayland(_)));
+            let activator = wayland.then(|| crate::wayland_activate::Activator::new(cc, cc)).flatten();
+            (crate::tray_linux::LinuxTray::spawn(tx.clone(), ctx.clone(), activator), wayland)
+        };
+        #[cfg(not(target_os = "linux"))]
+        let wayland = false;
+        let _ = ctx;
         let menu = MenuState { height: 400.0, ..Default::default() };
-        Self { _icon: icon, rx, tx: Arc::new(Mutex::new(tx)), menu: Arc::new(Mutex::new(menu)), created: false }
+        Self {
+            #[cfg(windows)]
+            _icon: icon,
+            #[cfg(target_os = "linux")]
+            linux,
+            wayland,
+            rx,
+            tx: Arc::new(Mutex::new(tx)),
+            menu: Arc::new(Mutex::new(menu)),
+            created: false,
+        }
+    }
+
+    /// A tray icon is showing, so the window can go to the tray.
+    pub fn available(&self) -> bool {
+        #[cfg(windows)]
+        {
+            self._icon.is_some()
+        }
+        #[cfg(target_os = "linux")]
+        {
+            self.linux.as_ref().is_some_and(|l| l.available())
+        }
+        #[cfg(not(any(windows, target_os = "linux")))]
+        {
+            false
+        }
+    }
+
+    /// The main window is a Wayland window.
+    pub fn wayland(&self) -> bool {
+        self.wayland
     }
 
     /// Open the menu with its bottom-right corner at `at` (for previews).
@@ -121,8 +170,16 @@ impl Tray {
 
 /// Keep the menu window alive (hidden when closed) and feed it fresh data.
 pub fn show(app: &mut SteamApp, ctx: &egui::Context) {
-    // No tray on Linux, and a "hidden" viewport shows there as an empty
-    // black window that can't be closed.
+    // Linux: the desktop draws the menu; just keep its contents current.
+    // (A "hidden" viewport would show there as an empty black window.)
+    #[cfg(target_os = "linux")]
+    {
+        let d = snapshot(app);
+        let info = crate::tray_linux::MenuInfo { signed_in: d.signed_in, name: d.name, state: d.me.state, online: d.online, download: d.download, language: format!("{:?}", i18n::language()) };
+        if let Some(l) = &mut app.tray.linux {
+            l.set_info(info);
+        }
+    }
     if !cfg!(windows) {
         return;
     }

@@ -29,7 +29,6 @@ serde_json.workspace = true
 fs4 = "1"
 qrcode.workspace = true
 global-hotkey.workspace = true
-tray-icon.workspace = true
 rfd = "0.18"
 open.workspace = true
 directories.workspace = true
@@ -39,6 +38,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 
 [target.'cfg(windows)'.dependencies]
+tray-icon.workspace = true
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_SystemInformation", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
 
 [build-dependencies]
@@ -46,3 +46,10 @@ winresource = "0.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 eframe = { workspace = true, features = ["wayland", "x11"] }
+# Tray icon over D-Bus (StatusNotifierItem): no GTK loop needed.
+ksni = { version = "0.3.7", features = ["blocking"] }
+# Raising the window on Wayland with the tray's activation token.
+raw-window-handle = "0.6"
+wayland-backend = { version = "0.3", features = ["client_system"] }
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
