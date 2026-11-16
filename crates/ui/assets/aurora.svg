@@ -1,13 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- Aurora: one curtain of light, brightest at its lower edge and fading
-       upward. White on transparent; the app tints it with the theme's text
-       color (and draws it on a dark tile for the window icon). -->
-  <defs>
-    <linearGradient id="fade" gradientUnits="userSpaceOnUse" x1="0" y1="50" x2="0" y2="8">
-      <stop offset="0" stop-color="#fff" stop-opacity="0.85"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
-    </linearGradient>
-  </defs>
-  <path d="M6 46 C18 54 30 50 40 40 C46 34 52 30 58 30 L54 8 C49 9 45 12 40 17 C31 26 21 30 11 25 Z" fill="url(#fade)"/>
-  <path d="M6 46 C18 54 30 50 40 40 C46 34 52 30 58 30" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+  <!-- Aurora: a round-arched A. Its crossbar is an aurora's bright lower edge,
+       and the arch above it glows. White on transparent; the app tints it with
+       the theme's text color (and draws it on a dark tile for the window icon). -->
+  <path d="M16.5,43.5 C24,47.5 30,35.5 47.5,37.5 L47.5,29.5 A15.5,15.5 0 0,0 16.5,29.5 Z" fill="#fff" fill-opacity="0.35"/>
+  <path d="M13,53.5 L13,29.5 A19,19 0 0,1 51,29.5 L51,53.5" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M13,43.5 C22,48.5 30,35.5 51,37.5" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round"/>
 </svg>
