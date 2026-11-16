@@ -349,6 +349,7 @@
 "Switch account…" = "Сменить аккаунт…"
 "Exit" = "Выход"
 "Exit SteamInRust" = "Выйти из SteamInRust"
+"Open {brand}" = "Открыть {brand}"
 "Activate a product on Steam" = "Активация продукта в Steam"
 "Enter a product key from a retail box, a bundle or a gift email." = "Введите ключ из коробки, набора или письма с подарком."
 "Activated!" = "Активировано!"
