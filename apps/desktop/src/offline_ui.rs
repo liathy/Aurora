@@ -77,7 +77,7 @@ pub fn connection_error(app: &mut SteamApp, ui: &mut Ui, t: &Theme, err: &Connec
         ui.add_space(4.0);
         ui.label(w::text_bold(t!("Connection error"), 22.0, t.text));
         ui.add_space(2.0);
-        ui.label(w::text(t!("SteamInRust can't reach the Steam servers right now."), 13.5, t.text_dim));
+        ui.label(w::text(t!("Aurora can't reach the Steam servers right now."), 13.5, t.text_dim));
         ui.add(egui::Label::new(w::text(i18n::tr_dyn(&err.message), 12.0, t.text_faint)).wrap());
         ui.add_space(14.0);
     });
@@ -253,7 +253,7 @@ pub fn status_note(app: &SteamApp, ui: &mut Ui, t: &Theme) {
     }
 }
 
-/// Play time on a game's page, with time played offline in SteamInRust
+/// Play time on a game's page, with time played offline in Aurora
 /// that Steam doesn't have yet.
 pub fn playtime_stat(ui: &mut Ui, t: &Theme, state: &client::State, app_id: model::AppId, steam_minutes: Option<u64>) {
     let (offline_total, not_sent) = state.offline_playtime.get(&app_id).copied().unwrap_or((0, 0));

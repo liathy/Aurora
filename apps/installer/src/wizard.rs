@@ -130,12 +130,12 @@ impl Wizard {
     }
 
     fn product(&self) -> &'static str {
-        "SteamInRust"
+        "Aurora"
     }
 
     pub fn start(&mut self, ctx: &egui::Context) {
         if self.mode != Mode::Uninstall && !work::has_payload() {
-            ask(&t!("SteamInRust Setup"), &t!("This setup was built without the app inside (developer build)."), false);
+            ask(&t!("Aurora Setup"), &t!("This setup was built without the app inside (developer build)."), false);
             ctx.send_viewport_cmd(ViewportCommand::Close);
             return;
         }
@@ -175,8 +175,8 @@ impl Wizard {
     }
 
     fn cancel(&self, ctx: &egui::Context) {
-        let title = if self.mode == Mode::Uninstall { t!("SteamInRust Uninstall") } else { t!("SteamInRust Setup") };
-        let q = if self.mode == Mode::Uninstall { t!("Are you sure you want to quit SteamInRust Uninstall?") } else { t!("Are you sure you want to quit SteamInRust Setup?") };
+        let title = if self.mode == Mode::Uninstall { t!("Aurora Uninstall") } else { t!("Aurora Setup") };
+        let q = if self.mode == Mode::Uninstall { t!("Are you sure you want to quit Aurora Uninstall?") } else { t!("Are you sure you want to quit Aurora Setup?") };
         if ask(&title, &q, true) {
             ctx.send_viewport_cmd(ViewportCommand::Close);
         }
@@ -212,11 +212,11 @@ impl eframe::App for Wizard {
             let g = self.progress.lock().unwrap().clone();
             if let Some(e) = g.error {
                 // Also kept in %TEMP%, for bug reports.
-                let _ = std::fs::write(std::env::temp_dir().join("SteamInRust-Setup.log"), format!("{e}
+                let _ = std::fs::write(std::env::temp_dir().join("Aurora-Setup.log"), format!("{e}
 
 {}", g.log.join("
 ")));
-                let title = if self.mode == Mode::Uninstall { t!("SteamInRust Uninstall") } else { t!("SteamInRust Setup") };
+                let title = if self.mode == Mode::Uninstall { t!("Aurora Uninstall") } else { t!("Aurora Setup") };
                 if ask(&title, &format!("{e}\n\n{}", t!("Click Yes to try again, or No to quit.")), true) {
                     self.start(&ctx);
                 } else {
@@ -235,7 +235,7 @@ impl eframe::App for Wizard {
         }
 
         // Bottom bar: etched line with the setup's name, then the buttons.
-        let label = format!("{} {}", t!("SteamInRust Setup"), env!("CARGO_PKG_VERSION"));
+        let label = format!("{} {}", t!("Aurora Setup"), env!("CARGO_PKG_VERSION"));
         let g = p.layout_no_wrap(label, font(11.5), DISABLED);
         p.hline(o.x..=o.x + W, o.y + BAR_TOP, Stroke::new(1.0, ETCH_DARK));
         p.hline(o.x..=o.x + W, o.y + BAR_TOP + 1.0, Stroke::new(1.0, WHITE));
@@ -311,7 +311,7 @@ impl Wizard {
         mesh.add_triangle(0, 2, 3);
         p.add(mesh);
         logo(&p, pos2(banner.center().x, banner.top() + 120.0), 30.0);
-        p.text(pos2(banner.center().x, banner.top() + 175.0), Align2::CENTER_CENTER, "SteamInRust", bold(15.0), WHITE);
+        p.text(pos2(banner.center().x, banner.top() + 175.0), Align2::CENTER_CENTER, "Aurora", bold(15.0), WHITE);
         p.text(pos2(banner.center().x, banner.top() + 195.0), Align2::CENTER_CENTER, t!("Native Steam client"), font(11.0), Color32::from_rgb(0x8F, 0x98, 0xA0));
         let area = Rect::from_min_max(pos2(banner.right(), o.y), pos2(o.x + W, o.y + BAR_TOP));
         p.rect_filled(area, CornerRadius::ZERO, WHITE);
@@ -404,7 +404,7 @@ impl Wizard {
                 let browse = Rect::from_min_size(pos2(field.right() + 10.0, field.top()), vec2(80.0, 23.0));
                 if button(ui, browse, &t!("Browse..."), true, false) {
                     if let Some(d) = rfd::FileDialog::new().set_directory(self.dir.trim()).pick_folder() {
-                        let d = if d.ends_with("SteamInRust") { d } else { d.join("SteamInRust") };
+                        let d = if d.ends_with("Aurora") { d } else { d.join("Aurora") };
                         self.dir = d.display().to_string();
                     }
                 }
@@ -473,7 +473,7 @@ impl Wizard {
             ctx.send_viewport_cmd(ViewportCommand::StartDrag);
         }
         logo(&p, pos2(o.x + 34.0, o.y + 34.0), 14.0);
-        p.text(pos2(o.x + 56.0, o.y + 34.0), Align2::LEFT_CENTER, "SteamInRust", bold(18.0), WHITE);
+        p.text(pos2(o.x + 56.0, o.y + 34.0), Align2::LEFT_CENTER, "Aurora", bold(18.0), WHITE);
         let g = self.progress.lock().unwrap().clone();
         if let Some(e) = &g.error {
             p.text(pos2(o.x + 22.0, o.y + 72.0), Align2::LEFT_TOP, t!("Update failed"), bold(13.0), Color32::from_rgb(0xE0, 0x5A, 0x4F));
@@ -496,7 +496,7 @@ impl Wizard {
         } else {
             t!("Installing update...")
         };
-        p.text(pos2(o.x + 22.0, o.y + 72.0), Align2::LEFT_TOP, t!("Updating SteamInRust..."), font(13.5), WHITE);
+        p.text(pos2(o.x + 22.0, o.y + 72.0), Align2::LEFT_TOP, t!("Updating Aurora..."), font(13.5), WHITE);
         let bar = Rect::from_min_size(pos2(o.x + 22.0, o.y + 98.0), vec2(376.0, 6.0));
         p.rect_filled(bar, CornerRadius::same(3), Color32::from_rgb(0x3D, 0x44, 0x50));
         let fill = Rect::from_min_size(bar.min, vec2(bar.width() * g.fraction.clamp(0.0, 1.0), bar.height()));

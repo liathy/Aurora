@@ -144,7 +144,7 @@ impl StoreClient {
             filters["review_score_filter"] = serde_json::json!({ "review_score_min": min });
         }
         let input = serde_json::json!({
-            "query_name": "SteamInRust",
+            "query_name": "Aurora",
             "query": { "start": start, "count": count, "sort": f.sort.id(), "filters": filters },
             "context": { "language": self.language, "country_code": self.country.to_uppercase() },
             "data_request": { "include_basic_info": true, "include_assets": true, "include_reviews": true, "include_platforms": true }

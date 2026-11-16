@@ -278,7 +278,7 @@ fn contents(d: &MenuData, ui: &mut Ui, t: &Theme) -> Option<TrayCmd> {
             });
         } else {
             w::logo(ui, t, 26.0);
-            ui.label(w::text_semibold("SteamInRust", 14.0, t.text));
+            ui.label(w::text_semibold("Aurora", 14.0, t.text));
         }
     });
     if d.signed_in {
@@ -327,7 +327,7 @@ fn contents(d: &MenuData, ui: &mut Ui, t: &Theme) -> Option<TrayCmd> {
         }
     }
     separator(ui, t);
-    if row(ui, t, icons::POWER, t!("Exit SteamInRust"), None, t.danger) {
+    if row(ui, t, icons::POWER, t!("Exit Aurora"), None, t.danger) {
         picked = Some(TrayCmd::Exit);
     }
     picked

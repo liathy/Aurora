@@ -64,7 +64,7 @@ pub fn load_real_steamclient() -> usize {
     let path = format!("{}\\{}", root.replace('/', "\\"), file);
     let w = wide(&path);
     let module = unsafe { LoadLibraryW(w.as_ptr()) };
-    // In a Proton prefix SteamInRust may have put this DLL in the Steam
+    // In a Proton prefix Aurora may have put this DLL in the Steam
     // folder itself: forwarding to ourselves would loop forever.
     const FROM_ADDRESS: u32 = 0x4;
     const UNCHANGED_REFCOUNT: u32 = 0x2;

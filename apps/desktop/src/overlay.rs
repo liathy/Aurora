@@ -431,7 +431,7 @@ pub fn show(app: &mut SteamApp, ctx: &egui::Context, actions: &mut Vec<Action>) 
         keep_ticking(app, ctx);
         return;
     }
-    let viewport = egui::ViewportId::from_hash_of("steam-rs-overlay");
+    let viewport = egui::ViewportId::from_hash_of("aurora-overlay");
     // Not true fullscreen: Windows turns a window that exactly covers the
     // screen into exclusive fullscreen, which drops transparency (the game
     // went black). One pixel short keeps it a normal see-through window.

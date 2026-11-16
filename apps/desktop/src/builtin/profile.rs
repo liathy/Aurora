@@ -37,7 +37,7 @@ pub struct Profile {
 
 impl Extension for Profile {
     fn manifest(&self) -> Manifest {
-        Manifest { id: "profile", name: "Profile", author: "SteamInRust", description: "Profiles", core: true, ..Manifest::DEFAULT }
+        Manifest { id: "profile", name: "Profile", author: "Aurora", description: "Profiles", core: true, ..Manifest::DEFAULT }
     }
 
     fn pages(&self) -> Vec<PageSpec> {

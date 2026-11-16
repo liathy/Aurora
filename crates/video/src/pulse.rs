@@ -85,7 +85,7 @@ impl Output {
         let bytes = |ms: u32| (rate as u64 * channels as u64 * 4 * ms as u64 / 1000) as u32;
         let attr = BufferAttr { maxlength: u32::MAX, tlength: bytes(AHEAD_MS), prebuf: bytes(AHEAD_MS / 4), minreq: u32::MAX, fragsize: u32::MAX };
         let mut err = 0;
-        let s = unsafe { (api.new)(std::ptr::null(), c"SteamInRust".as_ptr(), PA_STREAM_PLAYBACK, std::ptr::null(), c"Trailer".as_ptr(), &spec, std::ptr::null(), &attr, &mut err) };
+        let s = unsafe { (api.new)(std::ptr::null(), c"Aurora".as_ptr(), PA_STREAM_PLAYBACK, std::ptr::null(), c"Trailer".as_ptr(), &spec, std::ptr::null(), &attr, &mut err) };
         if s.is_null() {
             return Err(format!("couldn't open the audio output (PulseAudio error {err})"));
         }

@@ -4,7 +4,7 @@
 //! [`Server`] accepts connections on a per-run pipe name (Windows), or on a
 //! loopback TCP port elsewhere: games running with Proton reach it through
 //! Wine's sockets (see `launch::linux`). Every request
-//! carries the token SteamInRust gave that launch; known tokens become a
+//! carries the token Aurora gave that launch; known tokens become a
 //! [`Call`] for the online loop in `session.rs`, which answers from its own
 //! state and the CM connection (helpers below: user stats, storing stats,
 //! rich presence, player counts).
@@ -200,7 +200,7 @@ where
                     let _ = tx.send(Call { app_id, token: env.token, pid: env.pid, req: env.req, reply: rtx });
                     match tokio::time::timeout(wait, rrx).await {
                         Ok(Ok(r)) => r,
-                        _ => Reply::Err { message: "SteamInRust didn't answer".into() },
+                        _ => Reply::Err { message: "Aurora didn't answer".into() },
                     }
                 }
             }

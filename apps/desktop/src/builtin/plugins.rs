@@ -120,7 +120,7 @@ impl Extension for Plugins {
         Manifest {
             id: "plugins",
             name: "Plugin host",
-            author: "SteamInRust",
+            author: "Aurora",
             description: "Runs sandboxed user plugins from your plugins folder",
             core: true,
             ..Manifest::DEFAULT

@@ -52,7 +52,7 @@ pub fn attach(hwnd: HWND) {
     }
     unsafe {
         if MSG_CAPTURE.load(Ordering::Relaxed) == 0 {
-            MSG_CAPTURE.store(RegisterWindowMessageW(w!("SteamInRust.Overlay.Capture")), Ordering::Relaxed);
+            MSG_CAPTURE.store(RegisterWindowMessageW(w!("Aurora.Overlay.Capture")), Ordering::Relaxed);
         }
         let old = HWND_NOW.swap(hwnd.0 as isize, Ordering::AcqRel);
         if old != 0 {

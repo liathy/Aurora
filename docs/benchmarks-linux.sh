@@ -81,7 +81,7 @@ run() { # client run-number
   off=$(stat -c %s "$WEBLOG" 2>/dev/null || echo 0)
   t0=$(date +%s.%N)
   if [ "$client" = aurora ]; then
-    (cd "$AURORA_DIR" && exec env WAYLAND_DISPLAY= setsid ./steam-rs >/dev/null 2>&1) &
+    (cd "$AURORA_DIR" && exec env WAYLAND_DISPLAY= setsid ./aurora >/dev/null 2>&1) &
     root=$!
     wait_aurora_picker && ok=1 || ok=0
     t1=$(date +%s.%N)

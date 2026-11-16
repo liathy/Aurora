@@ -1,12 +1,12 @@
 [package]
-name = "steam-rs"
+name = "aurora"
 description = "A native Steam client written in Rust"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "steam-rs"
+name = "aurora"
 path = "src/main.rs"
 
 [dependencies]

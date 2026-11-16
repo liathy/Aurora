@@ -1,7 +1,7 @@
 id = "backlog"
 name = "Backlog Picker"
 version = "1.0.0"
-author = "SteamInRust"
+author = "Aurora"
 description = "Shows installed games you've never played and picks one for you."
 permissions = ["library.read", "storage"]
 

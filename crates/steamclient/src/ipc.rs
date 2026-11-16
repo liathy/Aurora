@@ -1,4 +1,4 @@
-//! Client side of the pipe to SteamInRust: one connection per request.
+//! Client side of the pipe to Aurora: one connection per request.
 //!
 //! On Windows that's a named pipe. Games running with Proton on Linux get
 //! `tcp:127.0.0.1:<port>` instead: Wine's named pipes stay inside Wine, but
@@ -8,14 +8,14 @@ use crate::protocol::{ENV_IPC, Envelope, Reply, Request};
 use std::io::{BufRead, BufReader, Write};
 use std::time::{Duration, Instant};
 
-/// `(pipe path, token)` from the environment SteamInRust gave the game.
+/// `(pipe path, token)` from the environment Aurora gave the game.
 pub fn target() -> Option<(String, String)> {
     let v = std::env::var(ENV_IPC).ok()?;
     let (pipe, token) = v.split_once('|')?;
     (!pipe.is_empty() && !token.is_empty()).then(|| (pipe.to_string(), token.to_string()))
 }
 
-/// Send one request and wait for the answer. `None` if SteamInRust can't be
+/// Send one request and wait for the answer. `None` if Aurora can't be
 /// reached (closed, signed out) or answered nonsense.
 pub fn request(req: Request) -> Option<Reply> {
     let (pipe, token) = target()?;

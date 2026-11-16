@@ -1,4 +1,4 @@
-// Backlog Picker: an example SteamInRust plugin.
+// Backlog Picker: an example Aurora plugin.
 // Lists installed games with no playtime and picks one at random.
 
 fn backlog() {

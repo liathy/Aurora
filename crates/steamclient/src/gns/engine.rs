@@ -1,6 +1,6 @@
 //! What all SteamNetworkingSockets connections in the game share: one UDP
 //! socket for ICE, our public address (STUN), the Valve-signed certificate,
-//! and the queue of rendezvous signals going out through SteamInRust.
+//! and the queue of rendezvous signals going out through Aurora.
 
 use super::conn::Io;
 use super::crypto::LocalCert;
@@ -143,7 +143,7 @@ fn local_ips() -> Vec<std::net::Ipv4Addr> {
 
 static SIGNALS: OnceLock<Mutex<Sender<(u64, Vec<u8>)>>> = OnceLock::new();
 
-/// Send rendezvous signals through SteamInRust, in order, off the caller's thread.
+/// Send rendezvous signals through Aurora, in order, off the caller's thread.
 pub fn send_signals(list: Vec<(u64, Vec<u8>)>) {
     if list.is_empty() {
         return;
@@ -199,7 +199,7 @@ pub fn fetch_cert(me: u64, app_id: u32) {
                 c
             }
             other => {
-                crate::log!("gns: no signed cert ({other:?}); using an unsigned one (only SteamInRust players accept it)");
+                crate::log!("gns: no signed cert ({other:?}); using an unsigned one (only Aurora players accept it)");
                 LocalCert::unsigned(key, me, app_id)
             }
         };

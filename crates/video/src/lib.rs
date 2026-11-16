@@ -311,7 +311,7 @@ impl Player {
         #[cfg(windows)]
         let decoder = true;
         if !decoder {
-            sh.fail(i18n::t!("Trailers need FFmpeg. Install the ffmpeg package, then restart SteamInRust."));
+            sh.fail(i18n::t!("Trailers need FFmpeg. Install the ffmpeg package, then restart Aurora."));
         } else {
             let (a, b) = (sh.clone(), sh.clone());
             let ok = std::thread::Builder::new().name("video-decode".into()).spawn(move || engine::video_thread(a)).is_ok()

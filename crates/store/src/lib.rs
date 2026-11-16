@@ -136,7 +136,7 @@ impl Default for StoreClient {
 impl StoreClient {
     pub fn new(country: &str, language: &str) -> Self {
         let http = reqwest::Client::builder()
-            .user_agent(concat!("SteamInRust/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("Aurora/", env!("CARGO_PKG_VERSION")))
             .build()
             .expect("http client");
         Self { http, country: country.into(), language: language.into() }

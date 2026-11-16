@@ -35,7 +35,7 @@ impl Extension for Community {
         Manifest {
             id: "community",
             name: "Community",
-            author: "SteamInRust",
+            author: "Aurora",
             description: "Friends and chat",
             core: true,
             ..Manifest::DEFAULT
@@ -251,7 +251,7 @@ fn message(ui: &mut Ui, t: &Theme, state: &State, m: &model::ChatMessage, join: 
         ui.add(egui::Label::new(w::text(&m.text, 14.0, t.text)).wrap());
         return;
     };
-    // Steam's invites are only markup; old SteamInRust ones were the link text.
+    // Steam's invites are only markup; old Aurora ones were the link text.
     if !m.text.is_empty() && !m.text.contains("steam://run/") {
         ui.add(egui::Label::new(w::text(&m.text, 14.0, t.text)).wrap());
     }

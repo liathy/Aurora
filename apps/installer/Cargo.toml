@@ -1,12 +1,12 @@
 [package]
 name = "installer"
-description = "SteamInRust setup: installs, updates and uninstalls the app"
+description = "Aurora setup: installs, updates and uninstalls the app"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "SteamInRust-Setup"
+name = "Aurora-Setup"
 path = "src/main.rs"
 
 [dependencies]

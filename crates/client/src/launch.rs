@@ -1,7 +1,7 @@
 //! Starting installed games, in one of three ways:
 //!
-//! - **Our steamclient** ([`LaunchMode::SteamInRust`]): games without
-//!   anti-cheat get SteamInRust's own `steamclient` DLL (crates/steamclient)
+//! - **Our steamclient** ([`LaunchMode::Aurora`]): games without
+//!   anti-cheat get Aurora's own `steamclient` DLL (crates/steamclient)
 //!   through the registry value Steam itself uses, so their Steam API calls
 //!   (user, achievements, cloud files…) are answered by this app.
 //! - **Official Steam** ([`LaunchMode::OfficialSteam`]): games with
@@ -23,8 +23,8 @@ use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LaunchMode {
-    /// Steam features come from SteamInRust's own steamclient.
-    SteamInRust,
+    /// Steam features come from Aurora's own steamclient.
+    Aurora,
     /// Runs through the official Steam client because of its anti-cheat
     /// (named in `anti_cheat`).
     OfficialSteam { anti_cheat: String },
@@ -59,7 +59,7 @@ pub fn mode(app: &OwnedApp, install_dir: &Path) -> LaunchMode {
         }
         return LaunchMode::OfficialSteam { anti_cheat: STEAM_DRM.into() };
     }
-    // Linux: SteamInRust starts the game itself, natively or with Proton.
+    // Linux: Aurora starts the game itself, natively or with Proton.
     // The official client only for anti-cheat (above), when the player asks
     // for it, or when there's no way to run the game here.
     #[cfg(not(windows))]
@@ -68,7 +68,7 @@ pub fn mode(app: &OwnedApp, install_dir: &Path) -> LaunchMode {
             return LaunchMode::OfficialSteam { anti_cheat: "Steam for Linux".into() };
         }
         return match linux::plan(app, install_dir) {
-            Ok(p) if linux::client_dll(&p, install_dir).is_some() => LaunchMode::SteamInRust,
+            Ok(p) if linux::client_dll(&p, install_dir).is_some() => LaunchMode::Aurora,
             // Native Linux games load Valve's own steamclient.so, which needs
             // a running Steam to connect to: the headless host is one.
             Ok(p) if !p.uses_proton() && headless_host_available() && !official_steam_open() => LaunchMode::HeadlessHost,
@@ -91,10 +91,10 @@ fn windows_mode(app: &OwnedApp, install_dir: &Path) -> LaunchMode {
     };
     if steamclient_dll(is64).is_none() {
         return LaunchMode::NoSteam {
-            reason: if is64 { "steamclient.dll not found next to SteamInRust" } else { "steamclient32.dll (for 32-bit games) not found next to SteamInRust" }.into(),
+            reason: if is64 { "steamclient.dll not found next to Aurora" } else { "steamclient32.dll (for 32-bit games) not found next to Aurora" }.into(),
         };
     }
-    LaunchMode::SteamInRust
+    LaunchMode::Aurora
 }
 
 /// What [`mode_cached`] remembers.
@@ -687,7 +687,7 @@ fn wait_until(limit: Duration, mut f: impl FnMut() -> bool) -> bool {
 
 /// Run a game through the official client (started with `-silent` if it
 /// isn't running) and block until the game closes. `started` is called once
-/// Steam reports the game running. `steam_id` is the SteamInRust account:
+/// Steam reports the game running. `steam_id` is the Aurora account:
 /// Steam signs in to it by itself when it remembers it. With `offline`,
 /// Steam starts in its own offline mode (if it isn't running already).
 /// Errors are for the player to read.
@@ -830,7 +830,7 @@ pub fn set_steam_setting(s: SteamSetting, on: bool) -> Result<(), String> {
 }
 
 /// The player's choice for Steam's "Allow downloads during gameplay", which
-/// SteamInRust applies before each game (off by default: with it on, Valve's
+/// Aurora applies before each game (off by default: with it on, Valve's
 /// engine keeps starting and suspending updates and shader downloads while
 /// the game runs, a few hundred MB on the headless host).
 static GAMEPLAY_DOWNLOADS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -844,8 +844,8 @@ pub fn gameplay_downloads() -> bool {
 }
 
 /// Before each game starts: put Steam's download and shader settings the way
-/// the player chose them in SteamInRust. Downloads during gameplay as chosen;
-/// Steam's background shader processing off while SteamInRust compiles
+/// the player chose them in Aurora. Downloads during gameplay as chosen;
+/// Steam's background shader processing off while Aurora compiles
 /// shaders before launch (so the engine doesn't do the same work again while
 /// the game runs). Shader pre-caching (the downloads) is left as it is.
 /// Skipped while Steam is running, since it would overwrite the file.
@@ -963,7 +963,7 @@ pub fn run_through_host(
         return Err(if why.starts_with("Steam is running") {
             "Close the official Steam first: only one Steam can run at a time.".into()
         } else {
-            format!("the headless Steam host didn't sign in ({why}). Check that this account is signed in to SteamInRust, then press Play again.")
+            format!("the headless Steam host didn't sign in ({why}). Check that this account is signed in to Aurora, then press Play again.")
         });
     }
     // Windows: steam_api finds Steam through this registry entry; point it at
@@ -1139,7 +1139,7 @@ struct LoginChanges {
     /// `config.vdf` `AlwaysShowUserChooser`.
     chooser: Option<(String, String)>,
     /// `loginusers.vdf` `WantsOfflineMode` / `SkipOfflineModeWarning` for a
-    /// game started while SteamInRust is offline: (key, steam id, before, ours).
+    /// game started while Aurora is offline: (key, steam id, before, ours).
     #[serde(default)]
     offline: Vec<(String, String, String, String)>,
 }
@@ -1391,7 +1391,7 @@ pub fn anti_cheat_headless() -> bool {
 }
 
 /// Linux: a Proton/compat tool (its internal name) the player chose in
-/// SteamInRust to run Windows games with, instead of Steam's pick.
+/// Aurora to run Windows games with, instead of Steam's pick.
 static PROTON_OVERRIDE: Mutex<Option<String>> = Mutex::new(None);
 
 /// Force a specific Proton for every Proton launch; `None`/empty = automatic.
@@ -1596,7 +1596,7 @@ mod linux {
         let windows = windows.ok_or_else(|| format!("{} has no launch option for this system", app.name))?;
         let root = root.ok_or("Steam Play needs a Steam install for Proton")?;
         // The player's choice for this game wins, then their global choice in
-        // SteamInRust, then Steam's mapping, then the best installed Proton.
+        // Aurora, then Steam's mapping, then the best installed Proton.
         let tool = own
             .or_else(|| super::proton_override().and_then(|name| compat::compat_tools(&root).into_iter().find(|t| t.name.eq_ignore_ascii_case(&name))))
             .or_else(|| compat::tool_for(&root, app.app_id))

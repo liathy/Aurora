@@ -99,7 +99,7 @@ impl Downloads {
 
 impl Extension for Downloads {
     fn manifest(&self) -> Manifest {
-        Manifest { id: "downloads", name: "Downloads", author: "SteamInRust", description: "Download queue and settings", core: true, ..Manifest::DEFAULT }
+        Manifest { id: "downloads", name: "Downloads", author: "Aurora", description: "Download queue and settings", core: true, ..Manifest::DEFAULT }
     }
 
     fn pages(&self) -> Vec<PageSpec> {
@@ -432,7 +432,7 @@ impl Downloads {
                 ui.end_row();
             });
             ui.add_space(6.0);
-            ui.label(w::text(t!("SteamInRust measures Steam's content servers and uses the fastest one, reuses unchanged parts of games when updating, and checks every piece as it arrives."), 12.5, t.text_faint));
+            ui.label(w::text(t!("Aurora measures Steam's content servers and uses the fastest one, reuses unchanged parts of games when updating, and checks every piece as it arrives."), 12.5, t.text_faint));
         });
     }
 }

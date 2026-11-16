@@ -614,7 +614,7 @@ fn app_menu(app: &mut SteamApp, ui: &mut Ui, t: &Theme, actions: &mut Vec<Action
             actions.push(Action::Navigate { page: "settings".into(), arg: Some("plugins".into()) });
         }
         // Like Steam's "Check for Steam Client Updates…".
-        if item(ui, icons::REFRESH, t!("Check for SteamInRust updates…")) {
+        if item(ui, icons::REFRESH, t!("Check for Aurora updates…")) {
             crate::updater::check(ui.ctx().clone(), true);
         }
         ui.separator();
@@ -735,7 +735,7 @@ fn account_menu(app: &mut SteamApp, ui: &mut Ui, t: &Theme, actions: &mut Vec<Ac
         if w::menu_item(ui, t, icons::SIGN_OUT, t!("Sign out of account")).clicked() {
             app.client.send(Command::LogOut);
         }
-        if w::menu_item_tinted(ui, t, icons::POWER, t!("Exit SteamInRust"), Some(t.danger)).clicked() {
+        if w::menu_item_tinted(ui, t, icons::POWER, t!("Exit Aurora"), Some(t.danger)).clicked() {
             app.request_exit(ui.ctx());
         }
     });

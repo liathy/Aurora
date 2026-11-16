@@ -1,17 +1,17 @@
-# Steam features in games started by SteamInRust
+# Steam features in games started by Aurora
 
 Games built with Steamworks call into Steam while they run: who is signed
 in, achievements, cloud saves, friends. Before this, games started by
-SteamInRust found no Steam and said "no connection to Steam" (or quit).
+Aurora found no Steam and said "no connection to Steam" (or quit).
 
-SteamInRust now starts every game in one of three ways. The game page
-shows which one ("Steam features: SteamInRust" / "Runs through Steam
+Aurora now starts every game in one of three ways. The game page
+shows which one ("Steam features: Aurora" / "Runs through Steam
 (anti-cheat)" / "Starts without Steam").
 
 | Game | How it starts | Steam features from |
 |---|---|---|
-| No anti-cheat, 64-bit | SteamInRust's own `steamclient` DLL | SteamInRust |
-| No anti-cheat, 32-bit | The same DLL built for 32-bit (`steamclient32.dll`) | SteamInRust |
+| No anti-cheat, 64-bit | Aurora's own `steamclient` DLL | Aurora |
+| No anti-cheat, 32-bit | The same DLL built for 32-bit (`steamclient32.dll`) | Aurora |
 | Any anti-cheat (VAC, Easy Anti-Cheat, BattlEye, …) | Official Steam client, started silently | Valve's Steam |
 | No anti-cheat, our DLL missing | Plain start, as before | none |
 
@@ -23,7 +23,7 @@ A game's `steam_api64.dll` never talks to Steam itself. It loads the
 process in `ActiveProcess\pid` is alive, then uses Steam's C++ interfaces.
 
 `crates/steamclient` is a Rust replacement for that DLL (same 41 exports as
-Valve's). For a launch, SteamInRust:
+Valve's). For a launch, Aurora:
 
 1. registers a one-time token on its pipe (`\\.\pipe\steaminrust-<pid>-…`);
 2. points `SteamClientDll64` (64-bit games) or `SteamClientDll` (32-bit
@@ -82,7 +82,7 @@ cargo build -p steamclient --target i686-pc-windows-gnu
 
 While developing, the launcher also finds
 `target/i686-pc-windows-gnu/<profile>/steamclient.dll` next to
-`target/<profile>/steam-rs.exe`.
+`target/<profile>/aurora.exe`.
 
 ### What works
 
@@ -95,13 +95,13 @@ While developing, the launcher also finds
   `UserAchievementStored` callbacks fire like on Steam. Other players' stats
   (`RequestUserStats`), current player count.
 - **Steam Cloud (API files)**: `ISteamRemoteStorage` reads and writes
-  `<Steam>/userdata/<account>/<app>/remote/`, which SteamInRust syncs with
+  `<Steam>/userdata/<account>/<app>/remote/`, which Aurora syncs with
   Steam Cloud before the game starts and after it closes (Auto-Cloud games
   were already covered).
 - **Friends**: friends list, names, online state, what they're playing.
 - **Rich presence**: what the game sets is sent to Steam, so friends see it.
-- **Playing status and playtime**: SteamInRust reports the game as played.
-- **In-game overlay**: in D3D11 games our steamclient draws SteamInRust's
+- **Playing status and playtime**: Aurora reports the game as played.
+- **In-game overlay**: in D3D11 games our steamclient draws Aurora's
   Shift+Tab overlay inside the game, like Steam's, and sends the game
   `GameOverlayActivated_t` when it opens and closes. While it's open the game
   doesn't get mouse or keyboard input. Other games get a separate overlay
@@ -124,7 +124,7 @@ While developing, the launcher also finds
   `GetAuthTicketForWebApi` returns the same kind of ticket; services that
   check the identity string may still refuse it (not tested yet).
 - **Lobbies and matchmaking** (`ISteamMatchmaking`): Steam's real lobbies,
-  through SteamInRust's connection to Steam's matchmaking service (the
+  through Aurora's connection to Steam's matchmaking service (the
   messages carry the game's app id in `routing_appid`, which is how Steam
   routes them). Create, join, leave, search with string/number/near/slot/
   distance filters and result counts, lobby and member data, owner, member
@@ -140,7 +140,7 @@ While developing, the launcher also finds
   `AcceptP2PSessionWithUser`, session state). Valve's client still runs
   this API on libjingle 0.4.0 (the Google Talk P2P library; its sources are
   in Steam's client build as `src/external/libjingle-0.4.0`), not on
-  SteamNetworkingSockets, and SteamInRust speaks the same protocol
+  SteamNetworkingSockets, and Aurora speaks the same protocol
   (`crates/steamclient/src/jingle.rs`, `pseudotcp.rs`):
   one `ClientP2PConnectionInfo` per candidate in Valve's serialization,
   libjingle's STUN connectivity checks (RFC 3489, username fragments),
@@ -150,7 +150,7 @@ While developing, the launcher also finds
   header (`[0][data]` on channel 0, `[1][i32 channel][data]`). Official
   players behind NAT offer a candidate on Valve's libjingle relay servers;
   those forward to the player anything carrying their binding's name, so
-  SteamInRust reaches them through the relay with no relay account of its
+  Aurora reaches them through the relay with no relay account of its
   own, and it works behind any NAT on our side. Each official peer gets
   its own UDP socket (players on one relay share its address). Tested
   live: Human Fall Flat joined a public lobby hosted by an official-client
@@ -158,7 +158,7 @@ While developing, the launcher also finds
   loaded the host's level ("Siege", 2 players). Hosting for official
   players uses the same code (tested against a stand-in libjingle peer
   over real UDP in both directions; not yet live).
-- **P2P between SteamInRust players** (the same API). Each side learns its LAN and
+- **P2P between Aurora players** (the same API). Each side learns its LAN and
   public (STUN) addresses, the two exchange them with a random session
   token through Steam (a lobby message addressed to that player when both
   are in a lobby, plus Steam's `ClientP2PConnectionInfo`), then connect
@@ -175,7 +175,7 @@ While developing, the launcher also finds
   `GetAchievementAchievedPercent`, most-achieved iteration.
 - **Avatars**: `GetSmall/Medium/LargeFriendAvatar` (32/64/184 px) with
   `GetImageSize` / `GetImageRGBA`; `AvatarImageLoaded_t` when one arrives.
-- **HTTP** (`ISteamHTTP`): requests made by SteamInRust for the game (GET,
+- **HTTP** (`ISteamHTTP`): requests made by Aurora for the game (GET,
   POST, …; headers, parameters, raw bodies, timeouts; body and headers of
   the answer; `HTTPRequestCompleted_t`).
 - **Networking sockets and messages** (`ISteamNetworkingSockets`,
@@ -187,7 +187,7 @@ While developing, the launcher also finds
   callbacks. Connections to other players speak Valve's own
   SteamNetworkingSockets protocol, ported from the open-source
   GameNetworkingSockets (`crates/steamclient/src/gns/`), so they work with
-  players on the official client as well as between SteamInRust players:
+  players on the official client as well as between Aurora players:
   - a certificate Steam signs for our Ed25519 key
     (`ClientNetworkingCertRequest`, EMsg 5621, raw 32-byte public key and
     the game's app id), fetched once per game in about 0.3 s;
@@ -253,7 +253,7 @@ While developing, the launcher also finds
   Datagram Relay). Connections to official-client players work when the
   direct (ICE) path is allowed. The official client's default "Steam
   Networking" setting shares IP addresses with friends but usually routes
-  strangers through Valve's relays, and SteamInRust has no relay client: a
+  strangers through Valve's relays, and Aurora has no relay client: a
   connection that needs a relay ends after the route search with a NAT
   traversal end reason. Two players who are both behind strict
   (symmetric) NATs have the same problem, since there's no relay to fall
@@ -262,7 +262,7 @@ While developing, the launcher also finds
   networking; a friend lobby is needed).
 - **Connecting by IP address** (`ConnectByIPAddress`, dedicated servers):
   Steam's sockets speak Valve's encrypted UDP protocol to those servers;
-  SteamInRust doesn't implement it, so these connections fail at once with
+  Aurora doesn't implement it, so these connections fail at once with
   a clear end reason instead of hanging. Listen sockets by IP get only P2P
   connections.
 - **Game servers** (`ISteamGameServer`): hosting a server Steam lists needs
@@ -282,10 +282,10 @@ While developing, the launcher also finds
   and the binding panel (Steam's overlay configurator).
 - **Server browser**: friends, favorites, history and spectator lists come
   back empty.
-- **The overlay**: SteamInRust's own Shift+Tab overlay, not Steam's. Global
+- **The overlay**: Aurora's own Shift+Tab overlay, not Steam's. Global
   stats (`RequestGlobalStats`): "failed".
 - **Joining from the friends list** (`GameLobbyJoinRequested_t`,
-  `+connect_lobby`) isn't wired to SteamInRust's friends list yet; join from
+  `+connect_lobby`) isn't wired to Aurora's friends list yet; join from
   the game's own lobby browser.
 
 ## 2. Official Steam (games with anti-cheat)
@@ -314,28 +314,28 @@ How it runs:
 
 1. Valve's DLL path is put back in the registry first, if a swap is active.
 2. Steam is found through `HKCU\Software\Valve\Steam\SteamExe`. If it isn't
-   running, `steam.exe -silent` starts it in the background and SteamInRust
+   running, `steam.exe -silent` starts it in the background and Aurora
    waits for it (`ActiveProcess\pid` alive).
-3. **Auto sign-in.** Before starting Steam, SteamInRust makes it sign in to
-   the same account as SteamInRust, the way Steam does after you pick an
+3. **Auto sign-in.** Before starting Steam, Aurora makes it sign in to
+   the same account as Aurora, the way Steam does after you pick an
    account in its list: `AutoLoginUser` in the registry, `AutoLogin "1"` for
    that account in `config/loginusers.vdf`, and Steam's "Ask which account
    to use each time Steam starts" off (`AlwaysShowUserChooser` in
    `config/config.vdf`). These changes are temporary. The values they
-   replace are saved first (`steam-sign-in-restore.json` in SteamInRust's
+   replace are saved first (`steam-sign-in-restore.json` in Aurora's
    config folder). `AutoLoginUser` goes back as soon as Steam has signed in.
    The two files go back once Steam has closed, because Steam rewrites them
-   when it exits: a background watcher does it while SteamInRust runs, and
-   the next SteamInRust sign-in does it otherwise. A value you changed
+   when it exits: a background watcher does it while Aurora runs, and
+   the next Aurora sign-in does it otherwise. A value you changed
    yourself in the meantime is left alone. This only works for accounts the
-   official client already remembers ("Remember me"); SteamInRust never
+   official client already remembers ("Remember me"); Aurora never
    passes your password or tokens to it. If Steam is already open at its
    account picker or sign-in window, nobody is signed in, so it's restarted
    signed in to the account. If it still isn't signed in
    (`ActiveProcess\ActiveUser` stays 0), you get a message asking you to sign
    in to the Steam window.
 4. `steam.exe -applaunch <appid> <args>` starts the game.
-5. SteamInRust follows `HKCU\Software\Valve\Steam\Apps\<appid>\Running` to
+5. Aurora follows `HKCU\Software\Valve\Steam\Apps\<appid>\Running` to
    show the game as running and when it closes. It doesn't send its own
    "playing" status (Steam does, and two would clash) and doesn't sync the
    cloud (Steam does). Stop closes processes running from the game folder.

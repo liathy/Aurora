@@ -33,7 +33,7 @@ README are the median of runs 1–3.
 - **Program size.** Steam: `~/.local/share/Steam` without `steamapps`,
   `userdata`, `appcache`, `depotcache`, `config`, `logs`, `package` (update
   downloads), `compatibilitytools.d` and the Millennium themes. Aurora: the
-  release folder (`steam-rs`, `steamhost`, the two `steamclient` DLLs).
+  release folder (`aurora`, `steamhost`, the two `steamclient` DLLs).
 
 ## Every run
 

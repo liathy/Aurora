@@ -1,5 +1,5 @@
 //! Messages between the steamclient DLL (inside a game) and the running
-//! SteamInRust app. Shared source: the app includes this file with
+//! Aurora app. Shared source: the app includes this file with
 //! `#[path]`, so both sides always agree.
 //!
 //! Transport: a named pipe. Each request opens a connection, writes one JSON
@@ -10,9 +10,9 @@
 use serde::{Deserialize, Serialize};
 
 /// Environment variable with `<pipe name>|<token>`, set only for games
-/// SteamInRust starts with its own steamclient.
+/// Aurora starts with its own steamclient.
 pub const ENV_IPC: &str = "STEAMINRUST_IPC";
-/// Lobby chat messages starting with this are SteamInRust's own (P2P
+/// Lobby chat messages starting with this are Aurora's own (P2P
 /// set-up between players), never shown to the game.
 pub const SIGNAL_PREFIX: &[u8] = b"\0SIR-P2P\0";
 /// Optional log file for the DLL.
@@ -66,7 +66,7 @@ pub enum Request {
     LobbyChat { lobby: u64, data: Vec<u8> },
     LobbySetOwner { lobby: u64, owner: u64 },
     LobbyInvite { lobby: u64, user: u64 },
-    /// Send a small signalling message to another player's SteamInRust
+    /// Send a small signalling message to another player's Aurora
     /// (P2P connection setup). With `lobby`, also as a lobby message
     /// addressed to that player.
     Signal { to: u64, data: Vec<u8>, lobby: u64 },
@@ -112,7 +112,7 @@ pub enum Request {
     Overlay { dialog: String, target: String },
     /// Steam's DRM wrapped around the game asked for Steam itself (not
     /// through steam_api): it will refuse to start on this DLL ("Application
-    /// load error 3:0000065432"). SteamInRust starts it on Valve's engine.
+    /// load error 3:0000065432"). Aurora starts it on Valve's engine.
     SteamDrm,
     /// Invite a friend to play with this connect string (ISteamFriends::InviteUserToGame).
     GameInvite { friend: u64, connect: String },
@@ -305,7 +305,7 @@ pub struct Lobby {
     pub members: Vec<LobbyMember>,
 }
 
-/// Something Steam told SteamInRust that the game needs to hear.
+/// Something Steam told Aurora that the game needs to hear.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "e")]
 pub enum GameEvent {
@@ -391,7 +391,7 @@ pub struct Session {
     pub beta: String,
     /// The player's stats for this game, when they could be loaded.
     pub stats: Option<Stats>,
-    /// SteamInRust isn't connected to Steam (offline mode): `BLoggedOn`
+    /// Aurora isn't connected to Steam (offline mode): `BLoggedOn`
     /// is false, stats come from the local cache and are sent later.
     #[serde(default)]
     pub offline: bool,

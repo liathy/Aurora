@@ -92,7 +92,7 @@ unsafe fn find_vtable() -> Option<(*mut usize, bool, bool)> {
     unsafe {
         let module = LoadLibraryW(w!("d3d11.dll")).ok()?;
         let create: CreateFn = std::mem::transmute(GetProcAddress(module, s!("D3D11CreateDeviceAndSwapChain"))?);
-        let hwnd = CreateWindowExW(WINDOW_EX_STYLE(0), w!("STATIC"), w!("SteamInRust overlay probe"), WS_OVERLAPPED, 0, 0, 64, 64, None, None, None, None).ok()?;
+        let hwnd = CreateWindowExW(WINDOW_EX_STYLE(0), w!("STATIC"), w!("Aurora overlay probe"), WS_OVERLAPPED, 0, 0, 64, 64, None, None, None, None).ok()?;
         let desc = DXGI_SWAP_CHAIN_DESC {
             BufferDesc: DXGI_MODE_DESC { Width: 64, Height: 64, Format: DXGI_FORMAT_R8G8B8A8_UNORM, ..Default::default() },
             SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },

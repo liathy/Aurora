@@ -585,7 +585,7 @@ pub struct Hub {
 
 impl Extension for Hub {
     fn manifest(&self) -> Manifest {
-        Manifest { id: "community_hub", name: "Community hub", author: "SteamInRust", description: "Workshop items, guides, discussions and achievements", core: true, ..Manifest::DEFAULT }
+        Manifest { id: "community_hub", name: "Community hub", author: "Aurora", description: "Workshop items, guides, discussions and achievements", core: true, ..Manifest::DEFAULT }
     }
 
     fn pages(&self) -> Vec<PageSpec> {

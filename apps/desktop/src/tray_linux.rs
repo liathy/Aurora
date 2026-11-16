@@ -181,7 +181,7 @@ impl ksni::Tray for Sni {
             item(with(t!("Downloads"), d.download.clone()), TrayCmd::Page("downloads"), true),
             item(t!("Settings"), TrayCmd::Page("settings"), true),
             MenuItem::Separator,
-            item(t!("Exit SteamInRust"), TrayCmd::Exit, true),
+            item(t!("Exit Aurora"), TrayCmd::Exit, true),
         ]);
         menu
     }

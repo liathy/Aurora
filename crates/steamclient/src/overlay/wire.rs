@@ -1,5 +1,5 @@
 //! Messages between the in-game overlay (inside the steamclient DLL) and the
-//! SteamInRust app. Shared source: the app includes this file with `#[path]`,
+//! Aurora app. Shared source: the app includes this file with `#[path]`,
 //! like `protocol.rs`. Plain std, no egui: the DLL stays small.
 //!
 //! Transport: the named pipe `<ipc pipe>-overlay`, one connection per game

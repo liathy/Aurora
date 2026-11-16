@@ -1,6 +1,6 @@
 //! `steam://` links, single-instance forwarding, and desktop shortcuts.
 //!
-//! - SteamInRust can register itself as the handler for `steam://` links
+//! - Aurora can register itself as the handler for `steam://` links
 //!   (Settings → Interface). The previous handler is saved so it can be
 //!   restored with one click.
 //! - Only one copy runs: a second launch (e.g. from a link or shortcut)
@@ -105,7 +105,7 @@ pub fn is_default_handler() -> bool {
     current_handler().is_some_and(|h| h.to_lowercase().contains(&exe().to_lowercase()))
 }
 
-/// Make SteamInRust open `steam://` links (saves the old handler first).
+/// Make Aurora open `steam://` links (saves the old handler first).
 #[cfg(windows)]
 pub fn register() -> Result<(), String> {
     if let Some(old) = current_handler().filter(|h| !h.to_lowercase().contains(&exe().to_lowercase())) {

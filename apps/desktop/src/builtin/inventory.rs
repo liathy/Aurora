@@ -77,7 +77,7 @@ pub struct Inventory {
 
 impl Extension for Inventory {
     fn manifest(&self) -> Manifest {
-        Manifest { id: "inventory", name: "Inventory", author: "SteamInRust", description: "Steam inventory", core: true, ..Manifest::DEFAULT }
+        Manifest { id: "inventory", name: "Inventory", author: "Aurora", description: "Steam inventory", core: true, ..Manifest::DEFAULT }
     }
 
     fn pages(&self) -> Vec<PageSpec> {

@@ -140,7 +140,7 @@ fn libraries_file() -> Option<PathBuf> {
     Some(dirs()?.config_dir().join("libraries.txt"))
 }
 
-/// Library folders added in SteamInRust (one per line), on top of the ones
+/// Library folders added in Aurora (one per line), on top of the ones
 /// Steam lists. They work with or without a Steam install.
 pub fn extra_libraries() -> Vec<PathBuf> {
     let Some(text) = libraries_file().and_then(|f| fs::read_to_string(f).ok()) else { return Vec::new() };
