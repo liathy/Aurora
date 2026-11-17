@@ -36,12 +36,7 @@ fn main() -> eframe::Result {
         return Ok(());
     }
 
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info,eframe=warn,egui_glow=warn".into()),
-        )
-        .init();
+    init_logging();
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -85,4 +80,21 @@ pub fn release_memory() {
     unsafe {
         libc::malloc_trim(0);
     }
+}
+
+
+/// Log to the terminal and to `aurora.log` in the settings folder (the
+/// last run's log is kept as `aurora.old.log`). On Windows the app has no
+/// console, so the file is the only log a player can send.
+fn init_logging() {
+    use tracing_subscriber::prelude::*;
+    let filter = || tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,eframe=warn,egui_glow=warn".into());
+    let dir = client::store::config_dir();
+    let file = std::fs::create_dir_all(&dir).ok().and_then(|()| {
+        let path = dir.join("aurora.log");
+        let _ = std::fs::rename(&path, dir.join("aurora.old.log"));
+        std::fs::File::create(path).ok()
+    });
+    let to_file = file.map(|f| tracing_subscriber::fmt::layer().with_ansi(false).with_writer(std::sync::Mutex::new(f)).with_filter(filter()));
+    tracing_subscriber::registry().with(tracing_subscriber::fmt::layer().with_filter(filter())).with(to_file).init();
 }
