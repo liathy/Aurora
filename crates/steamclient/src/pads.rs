@@ -109,7 +109,9 @@ fn mapped() -> Option<&'static Shared> {
             crate::log!("pads: no shared pads at {name}");
             return 0;
         }
-        unsafe { MapViewOfFile(h, access, 0, 0, std::mem::size_of::<Shared>()) as usize }
+        let view = unsafe { MapViewOfFile(h, access, 0, 0, std::mem::size_of::<Shared>()) as usize };
+        crate::log!("pads: shared pads from Aurora at {name} ({})", if view == 0 { "couldn't map them" } else { "mapped" });
+        view
     });
     unsafe { (*MAP as *const Shared).as_ref() }
 }
@@ -200,6 +202,13 @@ fn get_state(i: u32, out: *mut Pad, ex: bool) -> u32 {
     let real = if ex { x.get_ex.unwrap_or(x.get) } else { x.get };
     let r = unsafe { real(i, out) };
     note(i as usize, r == 0);
+    // The first time the game asks for each pad: what it gets.
+    static ASKED: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+    if i < 4 && ASKED.fetch_or(1 << i, Ordering::Relaxed) & (1 << i) == 0 {
+        let shared = shared_at(i as usize).is_some_and(|(s, k)| s.slots[k].read().is_some());
+        let live = mapped().is_some_and(|s| s.live());
+        crate::log!("pads: game reads XInput pad {i}: real pad {}, shared pad {} (Aurora's reader {})", r == 0, shared, if live { "running" } else { "not running" });
+    }
     if r == 0 || out.is_null() {
         return r;
     }
@@ -379,20 +388,60 @@ fn patch_all() -> usize {
     patched
 }
 
+/// The loaded modules that read controllers (XInput, DirectInput, raw HID,
+/// GameInput / Windows.Gaming.Input, SDL, Rewired), by file name.
+#[cfg(windows)]
+fn input_modules() -> Vec<String> {
+    use windows::Win32::Foundation::HMODULE;
+    use windows::Win32::System::ProcessStatus::EnumProcessModules;
+    use windows::Win32::System::Threading::GetCurrentProcess;
+    let mut modules = vec![HMODULE::default(); 1024];
+    let mut needed = 0u32;
+    if unsafe { EnumProcessModules(GetCurrentProcess(), modules.as_mut_ptr(), (modules.len() * size_of::<HMODULE>()) as u32, &mut needed) }.is_err() {
+        return vec!["(couldn't list them)".into()];
+    }
+    modules.truncate((needed as usize / size_of::<HMODULE>()).min(modules.len()));
+    let wanted = ["xinput", "dinput", "hid.dll", "gameinput", "windows.gaming.input", "sdl", "rewired", "steam_api"];
+    let mut out: Vec<String> = modules
+        .iter()
+        .map(|m| file_name(&module_path(m.0)).to_string())
+        .filter(|n| wanted.iter().any(|w| n.contains(w)))
+        .collect();
+    out.sort();
+    out.dedup();
+    if out.is_empty() {
+        out.push("none of XInput/DirectInput/HID/GameInput/SDL".into());
+    }
+    out
+}
+
+#[cfg(not(windows))]
+fn input_modules() -> Vec<String> {
+    Vec::new()
+}
+
 /// Show the app's pads to the game's own XInput. Only when the app shares
 /// pads (Windows; under Proton, Wine's XInput already sees every pad).
 pub fn install() {
     static ONCE: std::sync::Once = std::sync::Once::new();
     ONCE.call_once(|| {
-        if mapped().is_none() || XINPUT.is_none() {
+        if mapped().is_none() {
+            return;
+        }
+        if XINPUT.is_none() {
+            crate::log!("pads: no XInput on this system: shared pads can't reach the game");
             return;
         }
         let _ = std::thread::Builder::new().name("pads-imports".into()).spawn(|| {
             // Again now and then: games load engine plugins and XInput late.
-            loop {
+            for round in 0u32.. {
                 let n = std::panic::catch_unwind(patch_all).unwrap_or(0);
                 if n > 0 {
                     crate::log!("pads: {n} XInput imports now see shared controllers");
+                }
+                // Once the game is up: how it reads controllers.
+                if round == 5 {
+                    crate::log!("pads: input libraries in the game: {}", input_modules().join(", "));
                 }
                 std::thread::sleep(Duration::from_secs(3));
             }

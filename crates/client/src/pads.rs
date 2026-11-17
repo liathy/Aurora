@@ -59,6 +59,7 @@ mod imp {
         get_gamepads: unsafe extern "C" fn(*mut i32) -> *mut u32,
         type_for_id: unsafe extern "C" fn(u32) -> i32,
         vendor_for_id: unsafe extern "C" fn(u32) -> u16,
+        product_for_id: unsafe extern "C" fn(u32) -> u16,
         name_for_id: unsafe extern "C" fn(u32) -> *const c_char,
         open: unsafe extern "C" fn(u32) -> Gp,
         close: unsafe extern "C" fn(Gp),
@@ -105,6 +106,7 @@ mod imp {
             get_gamepads: f!("SDL_GetGamepads"),
             type_for_id: f!("SDL_GetGamepadTypeForID"),
             vendor_for_id: f!("SDL_GetGamepadVendorForID"),
+            product_for_id: f!("SDL_GetGamepadProductForID"),
             name_for_id: f!("SDL_GetGamepadNameForID"),
             open: f!("SDL_OpenGamepad"),
             close: f!("SDL_CloseGamepad"),
@@ -259,6 +261,9 @@ mod imp {
         tracing::info!("controllers: reading PlayStation/Switch/other pads for games");
         let mut pads: [Option<Open>; shm::SLOTS] = Default::default();
         let mut scanned: Option<Instant> = None;
+        // Every pad SDL reports, logged once (what it is, and if games get it).
+        let mut seen: std::collections::HashSet<u32> = Default::default();
+        let mut last_count = None;
         loop {
             if USERS.load(Ordering::Acquire) == 0 {
                 let mut running = RUNNING.lock().unwrap_or_else(|e| e.into_inner());
@@ -283,6 +288,17 @@ mod imp {
                 if !ids.is_null() {
                     let list: Vec<u32> = unsafe { std::slice::from_raw_parts(ids, n.max(0) as usize) }.to_vec();
                     unsafe { (sdl.free)(ids.cast()) };
+                    if last_count != Some(list.len()) {
+                        tracing::info!("controllers: SDL sees {} pad(s)", list.len());
+                        last_count = Some(list.len());
+                    }
+                    for &id in &list {
+                        if seen.insert(id) {
+                            let (kind, vendor, product) = unsafe { ((sdl.type_for_id)(id), (sdl.vendor_for_id)(id), (sdl.product_for_id)(id)) };
+                            let what = if is_xbox(sdl, id) { "Xbox, left to the game's XInput" } else { "shared with games" };
+                            tracing::info!("controllers: {} (SDL type {kind}, USB {vendor:04x}:{product:04x}): {what}", name(sdl, id));
+                        }
+                    }
                     for id in list {
                         if pads.iter().flatten().any(|o| o.id == id) || is_xbox(sdl, id) {
                             continue;

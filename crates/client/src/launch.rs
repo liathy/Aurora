@@ -370,6 +370,13 @@ pub fn spawn_with_steamclient(app: &OwnedApp, install_dir: &Path, extra_args: &s
     }
     if let Some(log) = std::env::var_os("STEAMINRUST_STEAMCLIENT_LOG") {
         cmd.env(crate::ipc::protocol::ENV_LOG, log);
+    } else if cfg!(windows) {
+        // Windows players can't set variables easily: the game's side logs
+        // next to aurora.log by default (fresh each launch; small, as each
+        // call is only logged its first few times).
+        let log = crate::store::config_dir().join("steamclient.log");
+        let _ = std::fs::remove_file(&log);
+        cmd.env(crate::ipc::protocol::ENV_LOG, log);
     }
     // Proton: a Steam folder whose legacycompat/ DLLs are ours, which Proton
     // copies into the prefix. Proton's Wine also swaps any "steamclient64"
