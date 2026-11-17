@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.8.1](https://github.com/mollie2999/Aurora/compare/v0.8.0...v0.8.1) (2026-11-17)
+
+### New
+
+* Launch options work like Steam's `%command%`: `MANGOHUD=1 %command%` sets variables for the game, `gamemoderun mangohud %command% -dx11` runs it through a wrapper with arguments after it. Without `%command%`, everything stays a game argument as before ([#15](https://github.com/mollie2999/Aurora/pull/15)) ([e792e1b](https://github.com/mollie2999/Aurora/commit/e792e1b6f5a59e50af6150bd1940c4fda4c9b6bc))
+* Linux: games with both a Windows and a Linux build ask which one to install (Windows with Proton stays the default); updates keep the one you have ([#17](https://github.com/mollie2999/Aurora/pull/17)) ([9a465f9](https://github.com/mollie2999/Aurora/commit/9a465f92bb2eaf5a6928e5faa963991c0d1a3ef8))
+* Badges, reviews and groups open in Aurora instead of the browser: all badges with your level and XP, reviews with playtime and helpful votes, groups with their member counts ([#20](https://github.com/mollie2999/Aurora/pull/20)) ([920794b](https://github.com/mollie2999/Aurora/commit/920794ba191c70bcc5aab6cc4d2046f7f2d29049))
+* Trading-card collections: a game badge opens its card set (which cards you have, how many, the badge so far, normal and foil), and a card in the inventory has a See set button ([#20](https://github.com/mollie2999/Aurora/pull/20)) ([5c2623c](https://github.com/mollie2999/Aurora/commit/5c2623c1f081984e14d10941c815d02fab3edb94)) ([f1c5bba](https://github.com/mollie2999/Aurora/commit/f1c5bbab4eec6230b354065a5cfce3d2117c3adf))
+
+### Fixes
+
+* Linux: a Proton game's first launch has Steam features (online, achievements). It used to get them only from the second launch; a short "Proton setup" now runs first ([#18](https://github.com/mollie2999/Aurora/pull/18)) ([6ba3137](https://github.com/mollie2999/Aurora/commit/6ba3137caaa26ff79cd834995ada1bc58796aae4))
+* Linux: games with a launcher (Cities: Skylines' Paradox Launcher, War Thunder) no longer lose Steam when the launcher hands over: Aurora waits for everything the game started ([#23](https://github.com/mollie2999/Aurora/pull/23)) ([3b2ab7e](https://github.com/mollie2999/Aurora/commit/3b2ab7e9fb30afb2a185d010bd50193049c64d75))
+* Linux: native games with a newer Steam SDK find Steam ("Steam is not running" before) ([#19](https://github.com/mollie2999/Aurora/pull/19)) ([f62bda6](https://github.com/mollie2999/Aurora/commit/f62bda6920cee652551245c3131dea1de3a5522c))
+* Linux: games on a drive whose path has a colon (like `/mnt/usb-…-0:0-part1`) start; Unity games like Cities: Skylines quit with exit code 1 there ([#22](https://github.com/mollie2999/Aurora/pull/22)) ([53ea3cf](https://github.com/mollie2999/Aurora/commit/53ea3cff814572aa620aa98ae23d1e20faaf5f52))
+* Linux: Linux builds installed by Aurora start ("Permission denied" before) ([#21](https://github.com/mollie2999/Aurora/pull/21)) ([890bfce](https://github.com/mollie2999/Aurora/commit/890bfce0587c9d89f3d0d6a05225a1cabba6dd96))
+* Linux: a game with only its Windows files installed runs them with Proton by default instead of looking for the missing Linux build ("No such file or directory") ([#16](https://github.com/mollie2999/Aurora/pull/16)) ([958e3b6](https://github.com/mollie2999/Aurora/commit/958e3b6e72f70ef651c38d10b8eb0860f5d5602a))
+
 ## [0.8.0](https://github.com/mollie2999/Aurora/compare/v0.7.2...v0.8.0) (2026-11-17)
 
 **SteamInRust is now Aurora everywhere:** the program is `aurora`, the Windows setup `Aurora-Setup`, the Linux archive `Aurora-Linux-x86_64`, the Arch package `aurora-bin` (it replaces `steamonrust-bin`). Your settings, sign-ins and caches stay where they are, and installed copies update and move over by themselves ([f87388a](https://github.com/mollie2999/Aurora/commit/f87388a5f5f79ad8a00c12bdd11a433650439e1e))

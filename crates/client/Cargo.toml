@@ -35,3 +35,6 @@ local.workspace = true
 
 [dev-dependencies]
 tracing-subscriber.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
