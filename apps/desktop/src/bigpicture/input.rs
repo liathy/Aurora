@@ -35,6 +35,26 @@ pub enum Device {
     Pad,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub enum ButtonHintMode {
+    #[default]
+    Auto,
+    Controller,
+    Keyboard,
+}
+
+impl ButtonHintMode {
+    pub const ALL: [Self; 3] = [Self::Auto, Self::Controller, Self::Keyboard];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Auto => i18n::t!("Auto"),
+            Self::Controller => i18n::t!("Controller"),
+            Self::Keyboard => i18n::t!("Keyboard"),
+        }
+    }
+}
+
 pub enum PadEvent {
     Press(Press),
     /// How many controllers are connected now.
@@ -615,5 +635,15 @@ mod tests {
         let held = std::collections::HashMap::new();
         let now = Instant::now();
         assert_eq!(next_poll_timeout(&held, now), Duration::from_millis(250));
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn button_hint_preference_round_trips_and_auto_is_default() {
+    assert_eq!(ButtonHintMode::default(), ButtonHintMode::Auto);
+    for mode in ButtonHintMode::ALL {
+        let encoded = serde_json::to_string(&mode).unwrap();
+        assert_eq!(serde_json::from_str::<ButtonHintMode>(&encoded).unwrap(), mode);
     }
 }

@@ -163,7 +163,8 @@ fn capsule(bp: &mut BigPicture, ui: &mut Ui, f: &Frame, r: Rect, hit: &Hit, orde
     let color = w::mix(f.t.text_dim, f.t.text, hit.glow);
     paint::line(c.painter(), pos2(r.left(), text_y), Align2::LEFT_TOP, name, w::font_semibold(19.0 * f.s), color, r.width());
     if !caption.is_empty() {
-        paint::line(c.painter(), pos2(r.left(), text_y + 26.0 * f.s), Align2::LEFT_TOP, caption, w::font(16.0 * f.s), f.t.text_faint, r.width());
+        let caption_size = if f.view.width() <= 1400.0 { 18.0 } else { 16.0 };
+        paint::line(c.painter(), pos2(r.left(), text_y + 26.0 * f.s), Align2::LEFT_TOP, caption, w::font(caption_size * f.s), f.t.text_faint, r.width());
     }
 }
 
@@ -396,7 +397,7 @@ fn home(bp: &mut BigPicture, ui: &mut Ui, f: &mut Frame, top: f32) -> f32 {
     let shelf_games: Vec<(AppId, String, u64)> = recent.iter().filter(|g| Some(g.0) != first).take(20).cloned().collect();
     if !shelf_games.is_empty() {
         heading(ui, f, &mut y, t!("Recently played"));
-        let tile = vec2(200.0 * s, 300.0 * s);
+        let tile = if f.view.width() <= 1400.0 { vec2(220.0, 330.0) } else { vec2(200.0, 300.0) } * s;
         let tiles = shelf(bp, ui, f, &mut y, "recent", shelf_games.len(), tile, |i| Id::unique(("bp-recent", shelf_games[i].0)));
         for (i, r, hit) in tiles {
             let (id, name, when) = &shelf_games[i];
