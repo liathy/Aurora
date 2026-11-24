@@ -22,6 +22,12 @@ build="$work/build"
 # The platform doubles as the SDK here because the payload is prebuilt.
 flatpak build-init --arch=x86_64 "$build" "$id" "$platform" "$platform" "$branch"
 install -Dm755 "$src/aurora" "$build/files/bin/aurora"
+if [[ -f "$src/libSDL3.so.0" ]]; then
+    install -Dm755 "$src/libSDL3.so.0" "$build/files/bin/libSDL3.so.0"
+fi
+if [[ -f "$src/SDL3-LICENSE.txt" ]]; then
+    install -Dm644 "$src/SDL3-LICENSE.txt" "$build/files/share/licenses/$id/SDL3-LICENSE.txt"
+fi
 install -Dm644 "$src/LICENSE" "$build/files/share/licenses/$id/LICENSE"
 install -Dm644 "$src/icon-256.png" \
     "$build/files/share/icons/hicolor/256x256/apps/$id.png"
