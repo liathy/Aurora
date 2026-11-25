@@ -403,7 +403,14 @@ impl State {
             Event::Friends(list) => self.friends = list.iter().copied().collect(),
             Event::Personas(list) => {
                 for p in list {
-                    self.personas.insert(p.steam_id, p.clone());
+                    let mut p = p.clone();
+                    // Steam's echoes of our own persona often leave the game
+                    // out; keep the game we know is running so our status
+                    // stays "In game" (green) instead of falling back to Online.
+                    if p.steam_id == self.steam_id && !p.in_game() {
+                        p.game_app_id = self.playing;
+                    }
+                    self.personas.insert(p.steam_id, p);
                 }
             }
             Event::Message(m) => {
@@ -1077,6 +1084,22 @@ mod group_tests {
         assert_eq!(r.fraction(), 0.8);
         s.apply(&Event::RestoreFinished { result: Err("cancelled".into()) });
         assert!(s.restoring.is_none());
+    }
+
+    #[test]
+    fn own_persona_stays_in_game_while_playing() {
+        let mut s = State { steam_id: 7, ..Default::default() };
+        s.apply(&Event::GameStarted { app_id: 730 });
+        // Steam echoes our persona without the game.
+        s.apply(&Event::Personas(vec![Persona { steam_id: 7, state: model::PersonaState::Online, ..Default::default() }]));
+        assert_eq!(s.me().unwrap().game_app_id, Some(730));
+        // Friends are taken as Steam sends them.
+        s.apply(&Event::Personas(vec![Persona { steam_id: 8, ..Default::default() }]));
+        assert!(!s.persona(8).in_game());
+        // Once the game closes, a later echo shows plain Online again.
+        s.apply(&Event::GameStopped { app_id: 730 });
+        s.apply(&Event::Personas(vec![Persona { steam_id: 7, ..Default::default() }]));
+        assert!(!s.me().unwrap().in_game());
     }
 
     #[test]
