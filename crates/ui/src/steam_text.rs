@@ -895,7 +895,7 @@ pub fn show_pieces(ui: &mut Ui, t: &Theme, pieces: &[Piece], size: f32, color: C
                     let revealed = st.spoiler && ui.ctx().data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
                     let mut fg = st.color.filter(|c| *c != Color32::PLACEHOLDER).unwrap_or(if st.heading > 0 { HEADING } else { color });
                     if st.link.is_some() {
-                        fg = t.accent_text();
+                        fg = t.link_color();
                     } else if st.faint {
                         fg = t.text_faint;
                     } else if st.quote {
@@ -929,6 +929,9 @@ pub fn show_pieces(ui: &mut Ui, t: &Theme, pieces: &[Piece], size: f32, color: C
                     }
                     if let Some(url) = &st.link {
                         let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text(url);
+                        if resp.hovered() {
+                            ui.painter().line_segment([resp.rect.left_bottom(), resp.rect.right_bottom()], Stroke::new(1.0, fg));
+                        }
                         if resp.clicked() {
                             clicked = Some(url.clone());
                         }
