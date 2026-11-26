@@ -10,6 +10,8 @@ use model::{Relationship, SteamId, Visibility, art};
 use std::collections::{HashMap, HashSet};
 use ui::{Theme, icons, widgets as w};
 
+#[path = "profile_classic.rs"]
+mod classic;
 #[path = "profile_pages.rs"]
 mod pages;
 #[path = "profile_edit.rs"]
@@ -66,6 +68,7 @@ enum GameSort {
 
 #[derive(Default)]
 pub struct Profile {
+    flags: super::settings::SharedFlags,
     /// `None` = your own profile.
     viewing: Option<SteamId>,
     /// A custom profile URL (steamcommunity.com/id/<name>) waiting for its
@@ -84,6 +87,7 @@ pub struct Profile {
     games_search: String,
     games_sort: GameSort,
     showcase_requested: HashSet<SteamId>,
+    classic_inventory_requested: HashSet<SteamId>,
     /// Last request for an item showcase inventory: (profile, app, context).
     /// Failed inventory RPCs need a retry; keeping only a set left the tiles
     /// shimmering forever after one transient Steam failure.
@@ -99,6 +103,12 @@ pub struct Profile {
     comment_start: std::collections::HashMap<SteamId, u32>,
     /// Editing your profile ("Edit profile" pages).
     edit: edit::EditState,
+}
+
+impl Profile {
+    pub fn new(flags: super::settings::SharedFlags) -> Self {
+        Self { flags, ..Self::default() }
+    }
 }
 
 impl Extension for Profile {
@@ -163,6 +173,8 @@ impl Extension for Profile {
 
     fn page(&mut self, _page: &str, ui: &mut Ui, ctx: &mut Ctx) {
         let t = ctx.theme.clone();
+        let steam_profile_ui = self.flags.lock().unwrap().steam_profile_ui;
+        ui.ctx().data_mut(|d| d.remove::<ProfileStyle>(profile_style_id()));
         // A custom profile URL: find its SteamID first.
         if let Some(vanity) = self.vanity.clone() {
             match ctx.state.vanity_ids.get(&vanity) {
@@ -197,10 +209,8 @@ impl Extension for Profile {
         if id != 0 && !ctx.state.profiles.contains_key(&id) && self.requested.insert(id) {
             ctx.send(Command::LoadProfile { steam_id: id });
         }
-        let persona = ctx.state.persona(id);
-        let info = ctx.state.profiles.get(&id).cloned();
         let friend = ctx.state.friends.get(&id) == Some(&Relationship::Friend);
-        let visibility = info.as_ref().map(|i| i.visibility).unwrap_or_default();
+        let visibility = ctx.state.profiles.get(&id).map(|i| i.visibility).unwrap_or_default();
         // Whether Steam will show us this profile's games, inventory and friends.
         let open = mine
             || match visibility {
@@ -211,6 +221,12 @@ impl Extension for Profile {
         if id != 0 && open && !ctx.state.player_games.contains_key(&id) && self.games_requested.insert(id) {
             ctx.send(Command::LoadPlayerGames { steam_id: id, language: i18n::language().steam_name().into() });
         }
+        if !steam_profile_ui {
+            self.classic_page(ui, &t, ctx, id, open);
+            return;
+        }
+        let persona = ctx.state.persona(id);
+        let info = ctx.state.profiles.get(&id).cloned();
         let display_name = if mine && !ctx.state.persona_name.is_empty() { ctx.state.persona_name.clone() } else { persona.name.clone() };
 
         // The profile's own Steam theme or game profile colors its panels,
@@ -220,14 +236,7 @@ impl Extension for Profile {
             Some(p) if !p.theme.is_empty() => themes::get(&p.theme),
             _ => info.as_ref().map(|i| i.theme.as_str()).filter(|t| !t.is_empty() && *t != "Default").and_then(themes::get),
         };
-        ui.ctx().data_mut(|d| match steam_theme {
-            Some(theme) => {
-                d.insert_temp(profile_theme_id(), theme);
-            }
-            None => {
-                d.remove::<themes::SteamTheme>(profile_theme_id());
-            }
-        });
+        ui.ctx().data_mut(|d| d.insert_temp(profile_style_id(), ProfileStyle::Steam(steam_theme)));
 
         // Full-page background, like a Steam profile.
         let full = ui.max_rect();
@@ -689,8 +698,15 @@ impl Profile {
                                 });
                             }
                         });
-                        let url = ui::steam_text::show(ui, t, c.html.trim(), ui::steam_text::Mode::Markup, 13.5, t.text);
-                        showcases::follow(ctx, url);
+                        match profile_style(ui) {
+                            ProfileStyle::Classic => {
+                                w::markup_label(ui, c.html.trim(), 13.5, t.text);
+                            }
+                            ProfileStyle::Steam(_) => {
+                                let url = ui::steam_text::show(ui, t, c.html.trim(), ui::steam_text::Mode::Markup, 13.5, t.text);
+                                showcases::follow(ctx, url);
+                            }
+                        }
                     });
                 });
             }
@@ -951,15 +967,28 @@ fn summary(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, id: SteamId, text: &str) {
     }
 }
 
-/// Translucent panel so the profile background shows through.
-/// Where the shown profile's Steam theme is kept for this frame.
-fn profile_theme_id() -> egui::Id {
-    egui::Id::unique("aurora-profile-steam-theme")
+/// The layout and Steam theme used while drawing the profile.
+#[derive(Clone, Copy, Default)]
+enum ProfileStyle {
+    #[default]
+    Classic,
+    Steam(Option<themes::SteamTheme>),
+}
+
+fn profile_style_id() -> egui::Id {
+    egui::Id::unique("aurora-profile-style")
+}
+
+fn profile_style(ui: &Ui) -> ProfileStyle {
+    ui.ctx().data(|d| d.get_temp(profile_style_id()).unwrap_or_default())
 }
 
 /// The shown profile's Steam theme, if it has one.
 pub(super) fn profile_theme(ui: &Ui) -> Option<themes::SteamTheme> {
-    ui.ctx().data(|d| d.get_temp::<themes::SteamTheme>(profile_theme_id()))
+    match profile_style(ui) {
+        ProfileStyle::Classic => None,
+        ProfileStyle::Steam(theme) => theme,
+    }
 }
 
 /// A section title: on a themed profile, on Steam's showcase header bar.
@@ -980,19 +1009,25 @@ pub(super) fn section_title(ui: &mut Ui, t: &Theme, title: &str) {
     }
 }
 
+/// Translucent panel so the profile background shows through.
 pub(super) fn panel(ui: &mut Ui, t: &Theme, add: impl FnOnce(&mut Ui)) {
     // A themed profile's panels take its background color (a game profile
     // may make them see-through, as Steam does).
     // Steam's panels: square, 10 px padding, 12 px apart.
-    let (fill, stroke, radius) = match profile_theme(ui) {
-        Some(theme) => (theme.panel_fill(), Stroke::NONE, CornerRadius::ZERO),
-        None => (t.chrome.gamma_multiply(0.85), Stroke::new(1.0, t.border), t.corner()),
+    let style = profile_style(ui);
+    let (fill, stroke, radius) = match style {
+        ProfileStyle::Steam(Some(theme)) => (theme.panel_fill(), Stroke::NONE, CornerRadius::ZERO),
+        _ => (t.chrome.gamma_multiply(0.85), Stroke::new(1.0, t.border), t.corner()),
+    };
+    let padding = match style {
+        ProfileStyle::Classic => 18,
+        ProfileStyle::Steam(_) => PANEL_PAD as i8,
     };
     egui::Frame::new()
         .fill(fill)
         .stroke(stroke)
         .corner_radius(radius)
-        .inner_margin(Margin::same(PANEL_PAD as i8))
+        .inner_margin(Margin::same(padding))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             add(ui);
@@ -1049,6 +1084,39 @@ fn badge_icon(ui: &mut Ui, t: &Theme, badge: &model::Badge, size: f32) -> bool {
 #[cfg(test)]
 mod tests {
     use extensions::Extension;
+
+    #[test]
+    fn only_steam_layout_requests_steam_profile_page_and_showcases() {
+        let flags = super::super::settings::SharedFlags::default();
+        let mut profile = super::Profile::new(flags.clone());
+        let egui = egui::Context::default();
+        ui::install_fonts(&egui);
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let client = client::Client::from_sender(tx);
+        let state = client::State { steam_id: 76561198000000000, ..Default::default() };
+        let local = local::LocalState::default();
+        let theme = ui::Theme::default();
+        let mut registry = extensions::Registry::default();
+        let mut actions = Vec::new();
+
+        for (steam_style, profile_arg) in [(false, None), (true, None), (false, Some("76561198000000001"))] {
+            flags.lock().unwrap().steam_profile_ui = steam_style;
+            profile.on_navigate("profile", profile_arg);
+            let mut ctx = extensions::Ctx::new(&state, &local, &theme, 1.0, &client, &mut registry, &mut actions);
+            let mut output = egui.run_ui(egui::RawInput::default(), |ui| profile.page("profile", ui, &mut ctx));
+            output.textures_delta.clear();
+            let mut page = false;
+            let mut showcases = false;
+            while let Ok(command) = rx.try_recv() {
+                match command {
+                    client::Command::LoadProfilePage { .. } => page = true,
+                    client::Command::LoadShowcases { .. } => showcases = true,
+                    _ => {}
+                }
+            }
+            assert_eq!((page, showcases), (steam_style, steam_style));
+        }
+    }
 
     #[test]
     fn badges_from_card_collections() {

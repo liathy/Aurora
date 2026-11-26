@@ -136,14 +136,22 @@ fn count_key(url: &str) -> &'static str {
     }
 }
 
+/// The fallback search window can end inside a UTF-8 character.
+fn prefix_within(s: &str, limit: usize) -> &str {
+    let mut end = s.len().min(limit);
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s[..end]
+}
+
 /// The line between a right-column section's count link and its first
 /// entry: Steam's "You have <a>1 group</a> in common". Kept as HTML so the
 /// count stays a link; "" when the section has no such line.
 fn in_common(right: &str, section: &str, entries: &[&str]) -> String {
     let Some(s) = after(right, section) else { return String::new() };
     let Some(s) = after(s, "class=\"profile_count_link ellipsis\"").and_then(|s| after(s, "</a>")) else { return String::new() };
-    let end = entries.iter().filter_map(|e| s.find(e)).min().unwrap_or(s.len().min(2000));
-    let window = &s[..end];
+    let window = entries.iter().filter_map(|e| s.find(e)).min().map_or_else(|| prefix_within(s, 2000), |end| &s[..end]);
     // Only the element holding the text, without the wrappers around it.
     let Some(a) = window.find("<a ") else { return String::new() };
     let start = window[..a].rfind("<div").map(|d| window[d..].find('>').map_or(d, |g| d + g + 1)).unwrap_or(0);
@@ -202,7 +210,7 @@ pub fn parse(html: &str) -> ProfilePage {
         page.level = between(info, "friendPlayerLevelNum\">", "<").and_then(|n| n.trim().parse().ok());
     }
     if let Some(fav) = after(html, "class=\"favorite_badge\"") {
-        let fav = &fav[..fav.find("profile_header_actions").unwrap_or(fav.len().min(3000))];
+        let fav = fav.split_once("profile_header_actions").map_or_else(|| prefix_within(fav, 3000), |(before, _)| before);
         let icon = after(fav, "<img").and_then(|i| attr(i, "src")).unwrap_or_default().to_string();
         let name = between(fav, "class=\"name ellipsis\">", "</div>").map(text).unwrap_or_default();
         let detail = between(fav, "class=\"xp\">", "</div>").map(text).unwrap_or_default();
@@ -214,9 +222,9 @@ pub fn parse(html: &str) -> ProfilePage {
     if let Some(st) = after(html, "class=\"profile_in_game persona ") {
         page.status = st.split('"').next().unwrap_or_default().trim().to_string();
         page.status_header = between(st, "profile_in_game_header\">", "</div>").map(text).unwrap_or_default();
-        let end = st.find("responsive_count_link_area").unwrap_or(st.len().min(2000));
-        page.status_detail = between(&st[..end], "profile_in_game_name\">", "</div>").map(text).unwrap_or_default();
-        page.join_link = after(&st[..end], "profile_in_game_joingame")
+        let window = st.split_once("responsive_count_link_area").map_or_else(|| prefix_within(st, 2000), |(before, _)| before);
+        page.status_detail = between(window, "profile_in_game_name\">", "</div>").map(text).unwrap_or_default();
+        page.join_link = after(window, "profile_in_game_joingame")
             .and_then(|j| after(j, "<a ").and_then(|a| attr(a, "href")))
             .filter(|h| h.starts_with("steam://"))
             .unwrap_or_default()
@@ -440,6 +448,31 @@ fn workshop(html: &str) -> Vec<model::PageWorkshop> {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn common_connections_preserve_utf8_at_the_fallback_boundary() {
+        let line = "You have <a href=\"/groups\">1 group</a> in common";
+        let start = format!("<div>{line}</div>");
+        let padding = "x".repeat(1999 - start.len());
+        let html = format!(r#"profile_group_links class="profile_count_link ellipsis"></a>{start}{padding}Я"#);
+        assert_eq!(super::in_common(&html, "profile_group_links", &["class=\"profile_group\""]), line);
+    }
+
+    #[test]
+    fn favorite_badge_preserves_utf8_at_the_fallback_boundary() {
+        let start = r#"><img src="https://example.com/badge.png"><div class="name ellipsis">Значок</div>"#;
+        let padding = "x".repeat(2999 - start.len());
+        let page = super::parse(&format!(r#"class="favorite_badge"{start}{padding}😀"#));
+        assert_eq!(page.featured_badge.unwrap().name, "Значок");
+    }
+
+    #[test]
+    fn game_status_preserves_utf8_at_the_fallback_boundary() {
+        let start = r#"in-game"><div class="profile_in_game_name">Игра</div>"#;
+        let padding = "x".repeat(1999 - start.len());
+        let page = super::parse(&format!(r#"class="profile_in_game persona {start}{padding}😀"#));
+        assert_eq!(page.status_detail, "Игра");
+    }
     #[test]
     fn reads_favorite_guide_details() {
         let html = r#"<div class="favoriteguide_showcase"><a data-publishedfileid="123"><img class="workshop_showcase_item_image" src="https://example.com/image.png"></a><div class="showcase_item_detail_title"><a>Guide title</a></div><div class="guide_showcase_contributors">Created by - <a>Author</a></div><div class="workshop_showcase_stars"><img src="https://example.com/stars.png">11 ratings</div><div class="workshop_showcase_app"><a><img src="https://example.com/app.png"></a><a>Game</a></div><div class="guide_showcase_item_description">Description</div></div>"#;

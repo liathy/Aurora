@@ -423,12 +423,57 @@ fn status_block(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, page: &ProfilePage, perso
 /// The game and join arguments in a Steam join link:
 /// `steam://joinlobby/<app>/<lobby>/<owner>` or `steam://connect/<server>`.
 fn join_from_link(link: &str, app: Option<model::AppId>) -> Option<(model::AppId, String)> {
-    let parts: Vec<&str> = link.strip_prefix("steam://")?.split('/').filter(|p| !p.is_empty()).collect();
-    match parts.as_slice() {
-        ["joinlobby", game, lobby, ..] => Some((game.parse().ok()?, format!("+connect_lobby {}", lobby.parse::<u64>().ok()?))),
-        ["connect", server, ..] => Some((app?, format!("+connect {server}"))),
-        _ => None,
+    let target = link.strip_prefix("steam://")?;
+    if let Some(server) = target.strip_prefix("connect/") {
+        let app = app?;
+        return valid_server_address(server).then(|| (app, format!("+connect {server}")));
     }
+    let mut parts = target.split('/').filter(|part| !part.is_empty());
+    if parts.next()? != "joinlobby" {
+        return None;
+    }
+    let game = parts.next()?.parse().ok()?;
+    let lobby = parts.next()?.parse::<u64>().ok()?;
+    Some((game, format!("+connect_lobby {lobby}")))
+}
+
+fn valid_server_address(server: &str) -> bool {
+    use std::net::{Ipv4Addr, Ipv6Addr};
+
+    if server.is_empty() || server.len() > 255 || server.starts_with(['-', '+']) {
+        return false;
+    }
+    if server.parse::<Ipv6Addr>().is_ok() {
+        return true;
+    }
+    if let Some(bracketed) = server.strip_prefix('[') {
+        let Some((address, suffix)) = bracketed.split_once(']') else { return false };
+        return address.parse::<Ipv6Addr>().is_ok() && (suffix.is_empty() || suffix.strip_prefix(':').is_some_and(valid_server_port));
+    }
+
+    let host = match server.split_once(':') {
+        Some((host, port)) if valid_server_port(port) => host,
+        Some(_) => return false,
+        None => server,
+    };
+    if host.parse::<Ipv4Addr>().is_ok() {
+        return true;
+    }
+
+    let host = host.strip_suffix('.').unwrap_or(host);
+    // An all-numeric dotted address must parse as IPv4, not as a hostname.
+    host.len() <= 253
+        && !host.bytes().all(|b| b.is_ascii_digit() || b == b'.')
+        && host.split('.').all(|label| {
+            (1..=63).contains(&label.len())
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+                && label.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        })
+}
+
+fn valid_server_port(port: &str) -> bool {
+    port.bytes().all(|b| b.is_ascii_digit()) && port.parse::<u16>().is_ok_and(|n| n != 0)
 }
 
 /// Steam's small green button (`btn_green_white_innerfade btn_small_thin`).
@@ -701,5 +746,28 @@ fn more_box(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, g: &RecentGame) {
     ui.painter().text(r.center(), Align2::CENTER_CENTER, &g.more, w::font_semibold(12.0), t.text);
     if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
         ctx.navigate("achievements", Some(g.app_id.to_string()));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::join_from_link;
+
+    #[test]
+    fn connect_links_reject_invalid_server_addresses() {
+        for server in [
+            "", "1.2.3.4 -exec evil", "+exec", "-exec", "host;quit", "host\nquit", "host\"quit", "host'quit", "host:65536", "host:0", "host:", "bad..host", "256.2.3.4", "user@host", "host?foo", "host#foo",
+            "/host", "host/password", &"a".repeat(256),
+        ] {
+            assert_eq!(join_from_link(&format!("steam://connect/{server}"), Some(440)), None, "{server:?}");
+        }
+    }
+
+    #[test]
+    fn connect_links_accept_supported_server_addresses() {
+        for server in ["1.2.3.4", "1.2.3.4:27015", "game-server.example.org:27015", "localhost", "::1", "[2001:db8::1]:27015"] {
+            assert_eq!(join_from_link(&format!("steam://connect/{server}"), Some(440)), Some((440, format!("+connect {server}"))));
+        }
+        assert_eq!(join_from_link("steam://joinlobby/440/1234/5678", None), Some((440, "+connect_lobby 1234".into())));
     }
 }

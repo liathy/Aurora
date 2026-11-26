@@ -316,7 +316,7 @@ fn bbcode(out: &mut Out, st: &mut State, tag: &str, src: &str, at: usize, end: u
         // Chat keeps only stickers (and Steam's raw emoticon tags).
         return match (name.as_str(), closing) {
             ("sticker", false) => {
-                let kind = attr(body, "type")?;
+                let kind = attr(body, "type").filter(|kind| valid_media_name(kind))?;
                 out.text(&src[text_start..at], st);
                 out.pieces.push(Piece::Sticker(kind));
                 let after = end + 1;
@@ -325,8 +325,12 @@ fn bbcode(out: &mut Out, st: &mut State, tag: &str, src: &str, at: usize, end: u
             }
             ("emoticon", false) => {
                 let close = src[end + 1..].find("[/emoticon]")? + end + 1;
+                let name = &src[end + 1..close];
+                if !valid_media_name(name) {
+                    return None;
+                }
                 out.text(&src[text_start..at], st);
-                out.pieces.push(Piece::Emoticon(src[end + 1..close].to_string(), st.style()));
+                out.pieces.push(Piece::Emoticon(name.to_string(), st.style()));
                 Some(Consumed::Through(close + "[/emoticon]".len()))
             }
             _ => None,
@@ -432,11 +436,14 @@ fn bbcode(out: &mut Out, st: &mut State, tag: &str, src: &str, at: usize, end: u
         }
         ("emoticon", false) => {
             let close = src[end + 1..].find("[/emoticon]")? + end + 1;
-            out.pieces.push(Piece::Emoticon(src[end + 1..close].to_string(), st.style()));
+            let name = &src[end + 1..close];
+            if valid_media_name(name) {
+                out.pieces.push(Piece::Emoticon(name.to_string(), st.style()));
+            }
             return Some(Consumed::Through(close + "[/emoticon]".len()));
         }
         ("sticker", false) => {
-            if let Some(kind) = attr(body, "type") {
+            if let Some(kind) = attr(body, "type").filter(|kind| valid_media_name(kind)) {
                 out.pieces.push(Piece::Sticker(kind));
             }
         }
@@ -579,15 +586,18 @@ fn html_tag(out: &mut Out, st: &mut State, tag: &str, before: &str) -> Option<Co
         }
         ("img", _) => {
             let src = attr(body, "src").unwrap_or_default();
-            let is_emoticon = class.contains("emoticon") || src.contains("/emoticon/");
-            if is_emoticon {
-                let name = src.rsplit('/').next().unwrap_or_default().to_string();
-                let name = if name.is_empty() { attr(body, "alt").unwrap_or_default().trim_matches(':').to_string() } else { name };
-                if !name.is_empty() {
-                    out.pieces.push(Piece::Emoticon(name, st.style()));
+            let emoticon = src.split_once("/emoticon/").map(|(_, name)| name);
+            if class.contains("emoticon") || emoticon.is_some() {
+                let name = emoticon.unwrap_or_else(|| src.rsplit('/').next().unwrap_or_default());
+                let alt = attr(body, "alt").unwrap_or_default();
+                let name = if name.is_empty() { alt.trim_matches(':') } else { name };
+                if !src.contains(['?', '#']) && valid_media_name(name) {
+                    out.pieces.push(Piece::Emoticon(name.to_string(), st.style()));
                 }
-            } else if src.contains("/sticker/") {
-                out.pieces.push(Piece::Sticker(src.rsplit('/').next().unwrap_or_default().to_string()));
+            } else if let Some((_, name)) = src.split_once("/sticker/") {
+                if valid_media_name(name) {
+                    out.pieces.push(Piece::Sticker(name.to_string()));
+                }
             }
         }
         _ => {}
@@ -639,6 +649,11 @@ fn parse_color(v: &str) -> Option<Color32> {
     })
 }
 
+/// Steam media names are inserted as single segments of CDN paths.
+fn valid_media_name(name: &str) -> bool {
+    (1..=64).contains(&name.len()) && name.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-'))
+}
+
 fn decode_entities(s: &str) -> String {
     if !s.contains('&') {
         return s.to_string();
@@ -648,7 +663,11 @@ fn decode_entities(s: &str) -> String {
     while let Some(at) = rest.find('&') {
         out.push_str(&rest[..at]);
         let tail = &rest[at..];
-        let Some(semi) = tail[..tail.len().min(12)].find(';') else {
+        let mut end = tail.len().min(12);
+        while !tail.is_char_boundary(end) {
+            end -= 1;
+        }
+        let Some(semi) = tail[..end].find(';') else {
             out.push('&');
             rest = &tail[1..];
             continue;
@@ -1004,6 +1023,33 @@ fn picture(ui: &mut Ui, url: &str, side: f32, fallback: &str, size: f32, color: 
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn entity_search_preserves_utf8_at_byte_twelve() {
+        for character in ["Я", "😀"] {
+            let input = format!("&{}{character} &amp;", "x".repeat(10));
+            assert_eq!(super::decode_entities(&input), format!("&{}{character} &", "x".repeat(10)));
+        }
+    }
+
+    #[test]
+    fn invalid_media_names_do_not_create_cdn_images() {
+        for name in ["", "../name", "name?x", "name#x", "a%2fb", "Я", &"x".repeat(65)] {
+            for mode in [Mode::Chat, Mode::Markup] {
+                for markup in [format!("[emoticon]{name}[/emoticon]"), format!(r#"[sticker type="{name}"][/sticker]"#)] {
+                    assert!(!parse(&markup, mode).iter().any(|p| matches!(p, Piece::Emoticon(..) | Piece::Sticker(..))), "{markup}");
+                }
+            }
+        }
+        for markup in [
+            r#"<img src="https://example.com/emoticon/../name" class="emoticon">"#,
+            r#"<img src="https://example.com/emoticon/name?x">"#,
+            r#"<img src="https://example.com/sticker/name#x">"#,
+            r#"<img class="emoticon" alt=":../name:">"#,
+        ] {
+            assert!(!parse(markup, Mode::Markup).iter().any(|p| matches!(p, Piece::Emoticon(..) | Piece::Sticker(..))), "{markup}");
+        }
+    }
     use super::*;
 
     fn texts(p: &[Piece]) -> String {
