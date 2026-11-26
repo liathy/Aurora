@@ -2664,3 +2664,6 @@
 "Could not load friends in common." = "Impossible de charger les amis en commun."
 "Steam-style profile page" = "Page de profil de style Steam"
 "Use the new Steam-style profile layout instead of Aurora's classic profile view." = "Utiliser la nouvelle présentation de style Steam à la place du profil classique d’Aurora."
+"Smooth scrolling" = "Défilement fluide"
+"Glide each mouse wheel step over a few frames. Off: the page jumps the whole step at once." = "Fait glisser chaque cran de la molette sur quelques images. Désactivé : la page saute tout le cran d'un coup."
+"Sort by recent activity" = "Trier par activité récente"

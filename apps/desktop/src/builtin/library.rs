@@ -160,6 +160,8 @@ struct Saved {
     hide_collections: bool,
     /// Collapsed sidebar group keys (collections and built-in sections).
     collapsed_groups: BTreeSet<String>,
+    /// Themed sidebar sorted by recent activity (Steam's clock button).
+    recent_order: bool,
     /// Collections as Steam last had them, for the account they belong to:
     /// the base of the three-way merge at sign-in.
     collections_base: Option<(u64, client::collections::Collections)>,
@@ -345,6 +347,8 @@ pub struct Library {
     shortcut_after_install: BTreeMap<AppId, std::path::PathBuf>,
     seen_finished: BTreeSet<AppId>,
     storage_dialog: Option<super::storage_ui::StorageDialog>,
+    /// Sidebar grouped by recent activity instead of the theme's grouping.
+    recent_order: bool,
 }
 
 impl Extension for Library {
@@ -647,6 +651,7 @@ impl Extension for Library {
             collections: self.collections.clone(),
             hide_collections: self.hide_collections,
             collapsed_groups: self.collapsed_groups.clone(),
+            recent_order: self.recent_order,
             collections_base: self.collections_base.clone(),
             through_steam: self.through_steam,
             pending_shortcuts: self.shortcut_after_install.clone(),
@@ -672,6 +677,7 @@ impl Extension for Library {
         self.collections = saved.collections;
         self.hide_collections = saved.hide_collections;
         self.collapsed_groups = saved.collapsed_groups;
+        self.recent_order = saved.recent_order;
         self.collections_base = saved.collections_base;
         self.through_steam = saved.through_steam;
         client::launch_through_steam(self.through_steam);
@@ -4403,7 +4409,7 @@ impl crate::theme_renderer::LibraryHost for Library {
                     });
 
                     let installed_on = self.filter == Filter::Installed;
-                    let recent_on = self.filter == Filter::Playing;
+                    let recent_on = self.recent_order;
                     let circle_toggle = |ui: &mut Ui, icon: &str, tip: &str, active: bool| -> bool {
                         let (r, resp) = ui.allocate_exact_size(vec2(24.0, 24.0), Sense::click());
                         let h = ui.ctx().animate_bool_with_time(resp.id, resp.hovered(), 0.08);
@@ -4414,8 +4420,9 @@ impl crate::theme_renderer::LibraryHost for Library {
                     if circle_toggle(ui, icons::PLAY, t!("Ready to play"), installed_on) {
                         self.filter = if installed_on { Filter::All } else { Filter::Installed };
                     }
-                    if circle_toggle(ui, icons::CLOCK, t!("Played"), recent_on) {
-                        self.filter = if recent_on { Filter::All } else { Filter::Playing };
+                    // Like Steam: sorts the list by recent activity; the filter stays.
+                    if circle_toggle(ui, icons::CLOCK, t!("Sort by recent activity"), recent_on) {
+                        self.recent_order = !recent_on;
                     }
                 });
             }
@@ -4459,6 +4466,7 @@ impl crate::theme_renderer::LibraryHost for Library {
         if self.hide_collections && matches!(self.filter, Filter::Collection(_)) {
             self.filter = Filter::All;
         }
+        let group_by = if self.recent_order { themes::LibraryGrouping::LastPlayed } else { group_by };
         let items = self.filtered(ctx);
         let searching = !self.search.trim().is_empty();
         let groups = self.sidebar_groups(&items, ctx, group_by, t!("All games"), !self.hide_collections && group_headers);

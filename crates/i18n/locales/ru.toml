@@ -2773,3 +2773,6 @@
 "Could not load friends in common." = "Не удалось загрузить общих друзей."
 "Steam-style profile page" = "Страница профиля в стиле Steam"
 "Use the new Steam-style profile layout instead of Aurora's classic profile view." = "Использовать новое оформление профиля в стиле Steam вместо классического вида Aurora."
+"Smooth scrolling" = "Плавная прокрутка"
+"Glide each mouse wheel step over a few frames. Off: the page jumps the whole step at once." = "Растягивает каждый шаг колеса мыши на несколько кадров. Выкл.: страница сразу прыгает на весь шаг."
+"Sort by recent activity" = "Сортировать по недавней активности"
