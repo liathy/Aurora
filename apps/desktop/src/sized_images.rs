@@ -369,13 +369,18 @@ mod tests {
         let ok = png(100, 100);
         assert_eq!(decode(&ok, false, 1600, 1200).unwrap().size, [100, 100]);
 
-        let wide = png(8193, 1);
-        assert!(decode(&wide, false, 1600, 1200).is_err(), "expected width > 8192 to be rejected");
+        // Narrow Workshop strips can exceed 8192 pixels and must be resized.
+        let workshop_strip = png(150, 30_393);
+        let resized = decode(&workshop_strip, false, 256, 512).unwrap();
+        assert!(resized.size[1] <= 512);
 
-        let tall = png(1, 8193);
-        assert!(decode(&tall, false, 1600, 1200).is_err(), "expected height > 8192 to be rejected");
+        let wide = png(MAX_IMAGE_DIM + 1, 1);
+        assert!(decode(&wide, false, 1600, 1200).is_err(), "expected width beyond the image limit to be rejected");
 
-        // 5000x5000 RGB = 75 MB (> 64 MiB max_alloc) while within 8192x8192 dimensions.
+        let tall = png(1, MAX_IMAGE_DIM + 1);
+        assert!(decode(&tall, false, 1600, 1200).is_err(), "expected height beyond the image limit to be rejected");
+
+        // 5000x5000 RGB = 75 MB (> 64 MiB max_alloc) within the dimension limit.
         let bomb = png(5000, 5000);
         assert!(decode(&bomb, false, 1600, 1200).is_err(), "expected > 64 MiB allocation to be rejected");
     }
