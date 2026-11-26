@@ -221,6 +221,19 @@ impl Extension for Profile {
         if id != 0 && open && !ctx.state.player_games.contains_key(&id) && self.games_requested.insert(id) {
             ctx.send(Command::LoadPlayerGames { steam_id: id, language: i18n::language().steam_name().into() });
         }
+        // Right-click on empty space: "Copy page URL" (this profile on Steam).
+        let path = match self.section {
+            Section::Games => "games/?tab=all",
+            Section::Badges => "badges/",
+            Section::Reviews => "recommended/",
+            Section::Groups => "groups/",
+            Section::CommonGroups => "groupscommon/",
+            Section::Cards => "badges/",
+            Section::Edit => "edit/info",
+            Section::Profile => "",
+        };
+        crate::links::page_url_menu(ui, &format!("https://steamcommunity.com/profiles/{id}/{path}"));
+
         if !steam_profile_ui {
             self.classic_page(ui, &t, ctx, id, open);
             return;

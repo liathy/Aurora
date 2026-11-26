@@ -98,6 +98,24 @@ pub fn web_action(url: &str) -> Option<extensions::Action> {
     None
 }
 
+/// Right-clicking empty space on a page offers "Copy page URL" (its address
+/// on Steam), like a browser. Call it before drawing the page: its widgets
+/// are added after, so they keep their own clicks and menus.
+pub fn page_url_menu(ui: &mut egui::Ui, url: &str) {
+    let resp = ui.interact(ui.max_rect(), ui.id().with("aurora-page-url-menu"), egui::Sense::click());
+    resp.context_menu(|ui| {
+        if ui.button(format!("{}  {}", ui::icons::COPY, i18n::t!("Copy page URL"))).clicked() {
+            ui.ctx().copy_text(url.to_string());
+            ui.close();
+        }
+    });
+}
+
+/// `base` with these query parameters, encoded.
+pub fn with_query(base: &str, params: &[(&str, &str)]) -> String {
+    reqwest::Url::parse_with_params(base, params).map(String::from).unwrap_or_else(|_| base.to_string())
+}
+
 /// Validate a YouTube video ID (`[A-Za-z0-9_-]+`).
 pub fn valid_youtube_id(id: &str) -> Option<&str> {
     let id = id.trim();

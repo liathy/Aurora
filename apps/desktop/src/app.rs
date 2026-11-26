@@ -72,6 +72,10 @@ pub struct Prefs {
     pub scroll_speed: f32,
     /// Glide mouse-wheel steps over a few frames (egui's smoothing).
     pub smooth_scroll: bool,
+    /// Draw the main window at most 60 times a second, even on faster
+    /// monitors (Settings > Accessibility).
+    #[serde(default)]
+    pub cap_fps: bool,
     /// The player has seen the one-time notice for Steam-DRM games (how they
     /// start through a background Steam instance).
     #[serde(default)]
@@ -156,6 +160,7 @@ impl Default for Prefs {
             favorite_friends: Vec::new(),
             scroll_speed: 2.0,
             smooth_scroll: true,
+            cap_fps: false,
             drm_host_ack: false,
             proton_override: None,
             proton_per_app: Default::default(),
@@ -234,6 +239,10 @@ pub struct SteamApp {
     confirm_exit: bool,
     window_mode: Option<WindowMode>,
     pub(crate) bigpicture: crate::bigpicture::BigPicture,
+    /// Middle-click autoscroll, like a browser.
+    autoscroll: crate::autoscroll::AutoScroll,
+    /// When the last frame started (for the 60 fps cap).
+    last_frame: Option<std::time::Instant>,
     /// A window size waiting to be centered once the monitor size is known.
     center_window: Option<[f32; 2]>,
     /// A window size asked for but not reached yet: (size, resizable, frames
@@ -372,6 +381,7 @@ impl SteamApp {
             toast_notifications: prefs.toast_notifications,
             scroll_speed: prefs.scroll_speed,
             smooth_scroll: prefs.smooth_scroll,
+            cap_fps: prefs.cap_fps,
             drm_host_ack: prefs.drm_host_ack,
             overlay_enabled: prefs.overlay_enabled,
             fps_counter: prefs.fps_counter,
@@ -442,6 +452,8 @@ impl SteamApp {
             confirm_exit: false,
             window_mode: None,
             bigpicture,
+            autoscroll: Default::default(),
+            last_frame: None,
             center_window: None,
             pending_size: None,
             tray: crate::tray::Tray::new(cc),
@@ -1245,6 +1257,12 @@ impl eframe::App for SteamApp {
                 }
             }
         }
+        // After the speed setting: autoscroll's speed follows the pointer.
+        if self.bigpicture.active {
+            self.autoscroll.stop();
+        } else {
+            self.autoscroll.feed(raw_input);
+        }
         if !self.prefs.smooth_scroll {
             instant_wheel(raw_input, _ctx.options(|o| o.input_options.line_scroll_speed));
         }
@@ -1257,8 +1275,23 @@ impl eframe::App for SteamApp {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        // "Limit to 60 fps" (Settings > Accessibility): at most 60 frames a
+        // second, even on faster monitors. A frame that comes sooner waits
+        // out the rest of its 1/60 s. Idle windows draw nothing, and slower
+        // timed redraws keep their own pace.
+        if self.prefs.cap_fps {
+            const MIN_FRAME: std::time::Duration = std::time::Duration::from_micros(16_667);
+            if let Some(last) = self.last_frame {
+                let elapsed = last.elapsed();
+                if elapsed < MIN_FRAME {
+                    std::thread::sleep(MIN_FRAME - elapsed);
+                }
+            }
+        }
+        self.last_frame = Some(std::time::Instant::now());
         let ctx = ui.ctx().clone();
         self.sync_theme_state(&ctx);
+        self.autoscroll.paint(&ctx, self.prefs.theme.accent);
         if self.applied_zoom != self.prefs.zoom {
             ctx.set_zoom_factor(self.prefs.zoom);
             self.applied_zoom = self.prefs.zoom;
@@ -1281,6 +1314,7 @@ impl eframe::App for SteamApp {
             self.prefs.toast_notifications = f.toast_notifications;
             self.prefs.scroll_speed = f.scroll_speed;
             self.prefs.smooth_scroll = f.smooth_scroll;
+            self.prefs.cap_fps = f.cap_fps;
             self.prefs.drm_host_ack = f.drm_host_ack;
             self.prefs.overlay_enabled = f.overlay_enabled;
             self.prefs.fps_counter = f.fps_counter;
