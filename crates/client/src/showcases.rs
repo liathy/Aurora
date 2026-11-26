@@ -196,6 +196,7 @@ fn parse_group(body: &str) -> Option<ShowcaseGroup> {
     let url = xml_field(body, "groupURL").map(|u| format!("https://steamcommunity.com/groups/{u}")).unwrap_or_default();
     Some(ShowcaseGroup {
         name,
+        headline: xml_field(body, "headline").unwrap_or_default(),
         url,
         avatar: xml_field(body, "avatarFull").filter(|a| a.starts_with("https://")),
         members: num("memberCount"),

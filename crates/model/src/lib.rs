@@ -863,7 +863,11 @@ pub struct ProfilePage {
     #[serde(default)]
     pub groups_in_common: String,
     #[serde(default)]
+    pub common_groups: Option<Result<Vec<UserGroup>, String>>,
+    #[serde(default)]
     pub friends_in_common: String,
+    #[serde(default)]
+    pub mutual_friends: Option<Result<Vec<PageFriend>, String>>,
     /// The "Join Game" link under an in-game status (e.g.
     /// `steam://joinlobby/381210/<lobby>/<owner>`); "" when there's none.
     #[serde(default)]
@@ -874,6 +878,39 @@ pub struct ProfilePage {
     /// Workshop showcases as the page draws them, in page order.
     #[serde(default)]
     pub workshop: Vec<PageWorkshop>,
+    #[serde(default)]
+    pub awards: Vec<PageAwards>,
+    #[serde(default)]
+    pub collectors: Vec<PageCollector>,
+    #[serde(default)]
+    pub guides: Vec<PageGuide>,
+    #[serde(default)]
+    pub showcase_items: Vec<(u64, String)>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PageGuide {
+    pub id: u64,
+    pub image: String,
+    pub title: String,
+    pub creator: String,
+    pub app: String,
+    pub app_icon: String,
+    pub rating_icon: String,
+    pub ratings: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PageCollector {
+    pub stats: Vec<PageStat>,
+    pub games: Vec<AppId>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PageAwards {
+    pub items: Vec<(String, String, String)>,
+    pub stats: Vec<PageStat>,
 }
 
 /// Steam's Completionist Showcase: game headers with their achievement
@@ -1059,6 +1096,8 @@ pub struct ShowcaseAchievement {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ShowcaseGroup {
     pub name: String,
+    #[serde(default)]
+    pub headline: String,
     pub url: String,
     pub avatar: Option<String>,
     pub members: u32,

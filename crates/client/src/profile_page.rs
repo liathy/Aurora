@@ -21,7 +21,39 @@ pub async fn load(web: Option<&Web>, steam_id: SteamId, language: &str) -> Resul
         .text()
         .await
         .map_err(|e| e.to_string())?;
-    Ok(parse(&body))
+    let mut page = parse(&body);
+    if !page.groups_in_common.is_empty() {
+        page.common_groups = Some(async {
+            let body = http.get(format!("{COMMUNITY}/profiles/{steam_id}/groupscommon/"))
+                .send().await.map_err(|e| e.to_string())?.error_for_status().map_err(|e| e.to_string())?
+                .text().await.map_err(|e| e.to_string())?;
+            let groups = crate::social::parse_groups(&body);
+            if !groups.is_empty() { return Ok(groups); }
+            // Some responses use a different page layout. Compare both full
+            // group lists using the signed-in account as a fallback.
+            let me = web.filter(|w| w.me != 0).ok_or("Sign in to load groups in common.")?.me;
+            let (theirs, ours) = tokio::try_join!(crate::social::groups(web, steam_id), crate::social::groups(web, me))?;
+            let normalize = |url: &str| url.trim_end_matches('/').to_ascii_lowercase();
+            let ours: std::collections::HashSet<_> = ours.iter().map(|g| normalize(&g.url)).collect();
+            Ok(theirs.into_iter().filter(|g| ours.contains(&normalize(&g.url))).collect())
+        }.await);
+    }
+    if !page.friends_in_common.is_empty() {
+        let result = async {
+            let body = http.get(format!("{COMMUNITY}/actions/PlayerList/"))
+                .query(&[("type", "friendsincommon".to_string()), ("target", steam_id.saturating_sub(BASE_ID).to_string()), ("l", lang.to_string())])
+                .send().await.map_err(|e| e.to_string())?
+                .error_for_status().map_err(|e| e.to_string())?
+                .text().await.map_err(|e| e.to_string())?;
+            let friends = parse_friends(&body);
+            if friends.is_empty() {
+                return Err("Steam did not return the friends in common list.".to_string());
+            }
+            Ok(friends)
+        }.await;
+        page.mutual_friends = Some(result);
+    }
+    Ok(page)
 }
 
 // ---------- small HTML helpers ----------
@@ -120,6 +152,24 @@ fn in_common(right: &str, section: &str, entries: &[&str]) -> String {
     if text(html).chars().any(|c| c.is_ascii_digit()) { html.to_string() } else { String::new() }
 }
 
+fn parse_friends(html: &str) -> Vec<PageFriend> {
+    let mut friends = Vec::new();
+    for f in blocks(html, "class=\"friendBlock persona ") {
+        let status = after(f, "class=\"friendBlock persona ").and_then(|s| s.split('"').next()).unwrap_or_default().trim().to_string();
+        let account: u64 = attr(f, "data-miniprofile").and_then(|a| a.parse().ok()).unwrap_or(0);
+        let level = between(f, "friendPlayerLevelNum\">", "<").and_then(|n| n.trim().parse().ok()).unwrap_or(0);
+        let avatar = after(f, "<img").and_then(|i| attr(i, "src")).map(String::from);
+        let content = between(f, "friendBlockContent\">", "<span class=\"friendSmallText\">").unwrap_or_default();
+        let name = text(content.split("<br>").next().unwrap_or_default());
+        let small = after(f, "<span class=\"friendSmallText\">").unwrap_or_default();
+        let small = &small[..small.rfind("</span>").unwrap_or(small.len())];
+        if account != 0 {
+            friends.push(PageFriend { steam_id: account + BASE_ID, name, avatar, status, lines: lines(small), level });
+        }
+    }
+    friends
+}
+
 // ---------- the page ----------
 
 pub fn parse(html: &str) -> ProfilePage {
@@ -212,19 +262,7 @@ pub fn parse(html: &str) -> ProfilePage {
             page.groups.push(PageGroup { name, url, avatar, members });
         }
     }
-    for f in blocks(right, "class=\"friendBlock persona ") {
-        let status = after(f, "class=\"friendBlock persona ").and_then(|s| s.split('"').next()).unwrap_or_default().trim().to_string();
-        let account: u64 = attr(f, "data-miniprofile").and_then(|a| a.parse().ok()).unwrap_or(0);
-        let level = between(f, "friendPlayerLevelNum\">", "<").and_then(|n| n.trim().parse().ok()).unwrap_or(0);
-        let avatar = after(f, "<img").and_then(|i| attr(i, "src")).map(String::from);
-        let content = between(f, "friendBlockContent\">", "<span class=\"friendSmallText\">").unwrap_or_default();
-        let name = text(content.split("<br>").next().unwrap_or_default());
-        let small = after(f, "<span class=\"friendSmallText\">").unwrap_or_default();
-        let small = &small[..small.rfind("</span>").unwrap_or(small.len())];
-        if account != 0 {
-            page.friends.push(PageFriend { steam_id: account + BASE_ID, name, avatar, status, lines: lines(small), level });
-        }
-    }
+    page.friends = parse_friends(right);
     page.friends.sort_by_key(|f| std::cmp::Reverse(f.level));
 
     // Recent Activity.
@@ -280,6 +318,44 @@ pub fn parse(html: &str) -> ProfilePage {
     }
     page.completionist = completionist(html);
     page.workshop = workshop(html);
+    page.guides = blocks(html, "class=\"favoriteguide_showcase\"").into_iter().filter_map(|b| {
+        let b = &b[..b.find("class=\"profile_customization\"").unwrap_or(b.len())];
+        let id = attr(b, "data-publishedfileid")?.parse().ok()?;
+        let image = after(b, "class=\"workshop_showcase_item_image\"").and_then(|s| attr(s, "src")).map(decode).map(|u| u.split('?').next().unwrap_or_default().to_string()).unwrap_or_default();
+        let title = between(b, "class=\"showcase_item_detail_title\">", "</div>").map(text).unwrap_or_default();
+        let creator = between(b, "class=\"guide_showcase_contributors\">", "</div>").map(text).unwrap_or_default();
+        let app_block = between(b, "class=\"workshop_showcase_app\">", "</div>").unwrap_or_default();
+        let app = text(app_block);
+        let app_icon = after(app_block, "<img").and_then(|s| attr(s, "src")).map(decode).unwrap_or_default();
+        let rating = between(b, "class=\"workshop_showcase_stars\">", "</div>").unwrap_or_default();
+        let rating_icon = after(rating, "<img").and_then(|s| attr(s, "src")).map(decode).unwrap_or_default();
+        let ratings = text(rating);
+        let description = between(b, "class=\"guide_showcase_item_description\">", "</div>").map(text).unwrap_or_default();
+        Some(model::PageGuide { id, image, title, creator, app, app_icon, rating_icon, ratings, description })
+    }).collect();
+    page.collectors = blocks(html, "class=\"gamecollector_showcase\"").into_iter().map(|b| {
+        let b = &b[..b.find("class=\"profile_customization\"").unwrap_or(b.len())];
+        let games = blocks(b, "class=\"showcase_slot showcase_gamecollector_game").into_iter().filter_map(|g| {
+            after(g, "steamcommunity.com/app/")?.split(|c: char| !c.is_ascii_digit()).next()?.parse().ok()
+        }).collect();
+        model::PageCollector { stats: stats(b), games }
+    }).collect();
+    page.awards = blocks(html, "class=\"awards_showcase\"").into_iter().map(|b| {
+        let b = &b[..b.find("class=\"profile_customization\"").unwrap_or(b.len())];
+        let items = blocks(b, "class=\"showcase_slot showcase_award\"").into_iter().filter_map(|a| {
+            let name = decode(attr(a, "data-tooltip-html").unwrap_or_default());
+            let image = decode(after(a, "<img").and_then(|i| attr(i, "src"))?);
+            let count = between(a, "showcase_award_count\">", "</span>").map(text).unwrap_or_default();
+            Some((name, image, count))
+        }).collect();
+        model::PageAwards { items, stats: stats(b) }
+    }).collect();
+    page.showcase_items = blocks(html, "class=\"showcase_slot item_showcase_item").into_iter().filter_map(|b| {
+        let href = after(b, "<a ").and_then(|a| attr(a, "href"))?;
+        let asset = href.rsplit('_').next()?.parse().ok()?;
+        let image = after(b, "<img").and_then(|a| attr(a, "src"))?;
+        Some((asset, decode(image)))
+    }).collect();
     page
 }
 
@@ -350,11 +426,11 @@ fn workshop(html: &str) -> Vec<model::PageWorkshop> {
                 .filter_map(|it| {
                     let id = attr(it, "data-publishedfileid").and_then(|v| v.parse().ok())?;
                     let app_id = attr(it, "data-appid").and_then(|v| v.parse().ok()).unwrap_or(0);
-                    // Steam asks for a 150 px letterboxed square; ask for the
-                    // picture at its own shape instead.
+                    // Fetch the original: Steam's image-resize service can
+                    // convert animated uploads into a static preview.
                     let src = after(it, "class=\"workshop_showcase_item_image\"").and_then(|s| attr(s, "src")).filter(|s| s.starts_with("https://"))?;
                     let base = decode(src).split('?').next().unwrap_or_default().to_string();
-                    Some(model::PageWorkshopItem { id, app_id, image: format!("{base}?imw=320&ima=fit&impolicy=Letterbox&letterbox=false") })
+                    Some(model::PageWorkshopItem { id, app_id, image: base })
                 })
                 .collect();
             model::PageWorkshop { title, url, avatar, items, stats: stats(b) }
@@ -364,6 +440,26 @@ fn workshop(html: &str) -> Vec<model::PageWorkshop> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn reads_favorite_guide_details() {
+        let html = r#"<div class="favoriteguide_showcase"><a data-publishedfileid="123"><img class="workshop_showcase_item_image" src="https://example.com/image.png"></a><div class="showcase_item_detail_title"><a>Guide title</a></div><div class="guide_showcase_contributors">Created by - <a>Author</a></div><div class="workshop_showcase_stars"><img src="https://example.com/stars.png">11 ratings</div><div class="workshop_showcase_app"><a><img src="https://example.com/app.png"></a><a>Game</a></div><div class="guide_showcase_item_description">Description</div></div>"#;
+        let page = super::parse(html);
+        let guide = &page.guides[0];
+        assert_eq!((guide.id, guide.title.as_str(), guide.creator.as_str(), guide.app.as_str(), guide.ratings.as_str()), (123, "Guide title", "Created by - Author", "Game", "11 ratings"));
+        assert_eq!(guide.description, "Description");
+    }
+
+    #[test]
+    fn reads_awards_collector_and_item_images() {
+        let html = r#"<div class="gamecollector_showcase"><div class="showcase_stats_row"><div class="showcase_stat"><div class="value">12</div><div class="label">Games</div></div></div><div class="showcase_slot showcase_gamecollector_game  "><a href="https://steamcommunity.com/app/42"></a></div></div><div class="profile_customization"><div class="awards_showcase"><div class="showcase_slot showcase_award" data-tooltip-html="Helpful"><img src="https://example.com/1.png"><span class="showcase_award_count">5</span></div><div class="showcase_stats_row"><div class="showcase_stat"><div class="value">7</div><div class="label">Awards Received</div></div></div></div></div><div class="showcase_slot item_showcase_item tradable_item "><a href="https://steamcommunity.com/id/x/inventory/#570_2_123"><img src="https://example.com/item.png"></a></div>"#;
+        let p = super::parse(html);
+        assert_eq!(p.collectors[0].games, [42]);
+        assert_eq!(p.collectors[0].stats[0].value, "12");
+        assert_eq!(p.awards[0].items[0].2, "5");
+        assert_eq!(p.awards[0].stats[0].value, "7");
+        assert_eq!(p.showcase_items[0].0, 123);
+    }
+
     // Shaped like steamcommunity.com's profile page (trimmed, made-up data).
     const PAGE: &str = r#"
 <style> body.GameProfileTheme { --gradient-right: rgba(255, 255, 255, 0); --color-showcase-header: rgb(120, 20, 40); --btn-background:rgba(0, 0, 0, .2); } </style>
@@ -474,7 +570,7 @@ Member since 23 November, 2014."><a href="https://steamcommunity.com/id/x/badges
         assert_eq!((w.title.as_str(), w.url.as_str()), ("Another Duck's Workshop", "https://steamcommunity.com/id/duck/myworkshopfiles/"));
         assert_eq!(w.avatar.as_deref(), Some("https://avatars.example/duck.jpg"));
         assert_eq!(w.items.iter().map(|i| (i.id, i.app_id)).collect::<Vec<_>>(), [(1201908955, 767), (1201909925, 767)]);
-        assert_eq!(w.items[0].image, "https://images.example/ugc/1/ABC/?imw=320&ima=fit&impolicy=Letterbox&letterbox=false");
+        assert_eq!(w.items[0].image, "https://images.example/ugc/1/ABC/");
         let stats: Vec<(&str, &str, &str)> = w.stats.iter().map(|s| (s.value.as_str(), s.label.as_str(), s.url.as_str())).collect();
         assert_eq!(stats, [("4", "Submissions", "https://steamcommunity.com/id/duck/myworkshopfiles/"), ("1", "Followers", "")]);
     }

@@ -7,7 +7,7 @@ use egui::{Align, Align2, Color32, CornerRadius, Layout, Margin, Rect, Sense, St
 use extensions::{Ctx, Extension, Manifest, PageSpec};
 use i18n::t;
 use model::{Relationship, SteamId, Visibility, art};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use ui::{Theme, icons, widgets as w};
 
 #[path = "profile_pages.rs"]
@@ -30,6 +30,7 @@ enum Section {
     Badges,
     Reviews,
     Groups,
+    CommonGroups,
     /// A game's card collection (the game and foil set in `Profile::cards`).
     Cards,
     /// Editing your own profile.
@@ -44,13 +45,14 @@ impl Section {
             Section::Badges => "badges",
             Section::Reviews => "reviews",
             Section::Groups => "groups",
+            Section::CommonGroups => "groupscommon",
             Section::Cards => "cards",
             Section::Edit => "edit",
         }
     }
 
     fn from_slug(s: Option<&str>) -> Section {
-        [Section::Games, Section::Badges, Section::Reviews, Section::Groups, Section::Cards].into_iter().find(|x| Some(x.slug()) == s).unwrap_or_default()
+        [Section::Games, Section::Badges, Section::Reviews, Section::Groups, Section::CommonGroups, Section::Cards].into_iter().find(|x| Some(x.slug()) == s).unwrap_or_default()
     }
 }
 
@@ -82,8 +84,10 @@ pub struct Profile {
     games_search: String,
     games_sort: GameSort,
     showcase_requested: HashSet<SteamId>,
-    /// Inventories item showcases asked for: (profile, app, context).
-    showcase_inventories: HashSet<(SteamId, model::AppId, u64)>,
+    /// Last request for an item showcase inventory: (profile, app, context).
+    /// Failed inventory RPCs need a retry; keeping only a set left the tiles
+    /// shimmering forever after one transient Steam failure.
+    showcase_inventories: HashMap<(SteamId, model::AppId, u64), std::time::Instant>,
     /// Steam profile pages and name histories asked for.
     page_requested: HashSet<SteamId>,
     aliases_requested: HashSet<SteamId>,
@@ -309,6 +313,10 @@ impl Extension for Profile {
                     let ui = &mut name_ui;
                     ui.set_width(name_w);
                     ui.spacing_mut().item_spacing = vec2(8.0, 4.0);
+                    // Rows as tall as their text, like Steam's lines: the
+                    // theme's 32 px button height would pad the location and
+                    // summary rows and push the summary down.
+                    ui.spacing_mut().interact_size.y = 0.0;
                     {
                                 let name = if mine && !ctx.state.persona_name.is_empty() { ctx.state.persona_name.clone() } else { persona.name.clone() };
                                 // Steam's `profile_header_centered_persona`: the
@@ -354,8 +362,11 @@ impl Extension for Profile {
                                 }).response.rect;
                                 let gap = persona_block.bottom() + PERSONA_PADDING_BOTTOM - ui.cursor().top();
                                 ui.add_space(gap.max(0.0));
-                                match info.as_ref().map(|i| i.summary.trim().to_string()) {
-                                    Some(s) if !s.is_empty() => {
+                                // Leading line breaks go, but not full-width
+                                // spaces: people indent with them, and Steam
+                                // keeps that indent.
+                                match info.as_ref().map(|i| i.summary.trim_end().trim_start_matches(|c: char| c.is_ascii_whitespace()).to_string()) {
+                                    Some(s) if !s.trim().is_empty() => {
                                         // Steam's BBCode, emoticons and emoji, like the real profile.
                                         summary(ui, &t, ctx, id, &s);
                                     }
@@ -407,24 +418,30 @@ impl Extension for Profile {
                             });
                         }
                 }
-                let mut right_ui = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_min_size(pos2(right_x, content_top + GUTTER), vec2(right_w, col_h))).layout(Layout::top_down(Align::Min)));
-                right_ui.set_width(right_w);
+                // Steam's right column is its own box with its content 10 px
+                // in, 12 px away from the left column.
+                let right_inner = right_w - PANEL_PAD * 2.0;
+                let mut right_ui = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_min_size(pos2(right_x + PANEL_PAD, content_top + GUTTER), vec2(right_inner, col_h))).layout(Layout::top_down(Align::Min)));
+                right_ui.set_width(right_inner);
                 self.right_column(&mut right_ui, &t, ctx, id, mine, open, &persona);
                 let content_bottom = left_ui.min_rect().bottom().max(right_ui.min_rect().bottom()) + GUTTER;
                 ui.allocate_rect(Rect::from_min_max(pos2(col.left(), content_top), pos2(col.right(), content_bottom)), Sense::hover());
 
                 // ---- the page column behind it all, as Steam themes paint it ----
                 let column = Rect::from_min_max(pos2(col.left(), page_top), pos2(col.right(), content_bottom));
-                let content = Rect::from_min_max(pos2(col.left(), content_top), pos2(col.right(), content_bottom));
                 match profile_theme(ui) {
-                    // Game profiles: a see-through header and frosted content.
+                    // Game profiles: a see-through header, and each column
+                    // frosted on its own with a gap between, like Steam.
                     Some(theme) if is_game_profile => {
+                        let boxes = [
+                            Rect::from_min_max(pos2(col.left() + GUTTER, content_top), pos2(right_x - GUTTER, content_bottom)),
+                            Rect::from_min_max(pos2(right_x, content_top), pos2(right_x + right_w, content_bottom)),
+                        ];
                         if let (Some(url), Some(bg)) = (bg_url.as_deref(), bg_rect) {
-                            if let Some(shape) = w::blurred_background_shape(ui, bg, content, url) {
-                                ui.painter().set(content_slot, shape);
-                            }
+                            let shapes: Vec<egui::Shape> = boxes.iter().filter_map(|b| w::blurred_background_shape(ui, bg, *b, url)).collect();
+                            ui.painter().set(content_slot, egui::Shape::Vec(shapes));
                         }
-                        ui.painter().set(tint_slot, egui::Shape::rect_filled(content, CornerRadius::ZERO, theme.frost_tint()));
+                        ui.painter().set(tint_slot, egui::Shape::Vec(boxes.iter().map(|b| egui::Shape::rect_filled(*b, CornerRadius::ZERO, theme.frost_tint())).collect()));
                     }
                     // Other themes: the whole column tinted, the panels on top.
                     Some(theme) => {

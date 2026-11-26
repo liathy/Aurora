@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 
 /// Decoded pictures nobody picked up for this long are dropped.
 const UNCLAIMED_FOR: Duration = Duration::from_secs(10);
-const MAX_IMAGE_DIM: u32 = 8192;
+const MAX_IMAGE_DIM: u32 = 32768;
 const MAX_IMAGE_ALLOC: u64 = 64 << 20;
 const MAX_QUEUED_JOBS: usize = 32;
 
@@ -231,7 +231,7 @@ impl ImageLoader for SizedLoader {
         }
         match ctx.try_load_bytes(url) {
             Ok(BytesPoll::Ready { bytes, .. }) => {
-                let is_anim_webp = bytes.get(8..12) == Some(b"WEBP")
+                let is_anim_webp = bytes.starts_with(b"GIF8") || bytes.windows(4).take(1024).any(|w| w == b"acTL") || bytes.get(8..12) == Some(b"WEBP")
                     && image::codecs::webp::WebPDecoder::new(std::io::Cursor::new(&bytes[..]))
                         .is_ok_and(|d| d.has_animation());
                 let job = Job { uri: uri.to_string(), bytes: bytes.clone(), cover, blur, w, h, ctx: ctx.clone() };

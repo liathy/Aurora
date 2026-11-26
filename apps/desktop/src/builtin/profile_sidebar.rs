@@ -258,7 +258,18 @@ impl Profile {
             if let Some(c) = page.counts.iter().find(|c| c.key == "friends") {
                 ui.add_space(14.0);
                 count_header(ui, t, ctx, id, mine, c);
-                in_common(ui, t, ctx, &page.friends_in_common);
+                if !page.friends_in_common.is_empty() {
+                    let html = &page.friends_in_common;
+                    let html = if let Some(start) = html.find("<a ") {
+                        if let Some(end) = html[start..].find('>') {
+                            format!("{}<a href=\"aurora:mutual-friends\">{}", &html[..start], &html[start + end + 1..])
+                        } else { html.clone() }
+                    } else { html.clone() };
+                    if ui::steam_text::show(ui, t, &html, ui::steam_text::Mode::Markup, 12.5, t.text_dim).is_some() {
+                        ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new(("mutual-friends", id)), true));
+                    }
+                    ui.add_space(4.0);
+                }
                 let mut friends = page.friends.clone();
                 friends.sort_by_key(|f| std::cmp::Reverse(f.level));
                 for f in friends.iter().take(6) {
@@ -266,6 +277,42 @@ impl Profile {
                 }
             }
         });
+        let open_id = egui::Id::new(("mutual-friends", id));
+        if ui.ctx().data(|d| d.get_temp::<bool>(open_id).unwrap_or(false)) {
+            let mut close = false;
+            let modal = w::modal(ui.ctx(), egui::Id::new(("mutual-friends-modal", id))).show(ui.ctx(), |ui| {
+                ui.set_width(ui.available_width().min(820.0));
+                ui.horizontal(|ui| {
+                    ui.label(w::text_bold(t!("Friends in Common"), 20.0, t.text));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if w::icon_button(ui, t, icons::X, t!("Close"), false, 0).clicked() { close = true; }
+                    });
+                });
+                ui.add_space(12.0);
+                match &page.mutual_friends {
+                    Some(Ok(friends)) if !friends.is_empty() => {
+                        egui::ScrollArea::vertical().max_height(400.0).show(ui, |ui| {
+                            let cols = if ui.available_width() >= 600.0 { 3 } else if ui.available_width() >= 400.0 { 2 } else { 1 };
+                            for row in friends.chunks(cols) {
+                                ui.columns(cols, |columns| {
+                                    for (ui, friend) in columns.iter_mut().zip(row) {
+                                        friend_row(ui, t, ctx, friend);
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    Some(Ok(_)) => { ui.label(w::text(t!("No friends in common found."), 13.0, t.text_dim)); }
+                    Some(Err(e)) => { ui.label(w::text(e, 13.0, t.text_dim)); }
+                    None => { ui.label(w::text(t!("Could not load friends in common."), 13.0, t.text_dim)); }
+                }
+                ui.add_space(12.0);
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if w::button(ui, t, None, t!("OK"), w::Kind::Secondary, w::Size::Sm).clicked() { close = true; }
+                });
+            });
+            if close || modal.should_close() { ui.ctx().data_mut(|d| d.insert_temp(open_id, false)); }
+        }
     }
 
     /// Steam's Recent Activity: each game with hours, last played,
@@ -477,7 +524,7 @@ fn friend_row(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, f: &PageFriend) {
     // Level on the right, like Steam.
     let lr = Rect::from_center_size(pos2(r.right() - 20.0, r.center().y), vec2(34.0, 34.0));
     let mut child = ui.new_child(egui::UiBuilder::new().max_rect(lr).layout(Layout::left_to_right(Align::Center)));
-    level_badge(&mut child, t, f.level);
+    if f.level > 0 { level_badge(&mut child, t, f.level); }
     if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
         ctx.navigate("profile", Some(f.steam_id.to_string()));
     }

@@ -33,12 +33,12 @@ fn title_of(s: &Showcase) -> String {
         kind::WORKSHOP | kind::MY_WORKSHOP => t!("Workshop Showcase").to_string(),
         kind::ARTWORK | kind::SINGLE_ARTWORK => t!("Artwork Showcase").to_string(),
         kind::VIDEO => t!("Video Showcase").to_string(),
-        kind::GUIDES => t!("Guide Showcase").to_string(),
+        kind::GUIDES => t!("Favorite Guide").to_string(),
         kind::MY_GUIDES => t!("My Guides Showcase").to_string(),
         kind::ACHIEVEMENTS => t!("Achievement Showcase").to_string(),
         kind::GREENLIGHT | kind::MY_GREENLIGHT => t!("Greenlight Showcase").to_string(),
         kind::SALIEN => t!("Saliens Showcase").to_string(),
-        kind::REACTIONS => t!("Points Shop Reactions").to_string(),
+        kind::REACTIONS => t!("Awards Showcase").to_string(),
         kind::COMPLETIONIST => t!("Completionist Showcase").to_string(),
         kind::REPLAY => t!("Steam Replay").to_string(),
         _ => t!("Showcase").to_string(),
@@ -70,7 +70,7 @@ impl Profile {
             Some(Ok(p)) => Some(p.clone()),
             _ => None,
         };
-        let (mut nth_completionist, mut nth_workshop) = (0, 0);
+        let (mut nth_completionist, mut nth_workshop, mut nth_awards, mut nth_collector, mut nth_guide) = (0, 0, 0, 0, 0);
         for s in &list {
             let from_page = match s.kind {
                 kind::COMPLETIONIST => {
@@ -80,6 +80,18 @@ impl Profile {
                 kind::MY_WORKSHOP => {
                     nth_workshop += 1;
                     page.as_ref().and_then(|p| p.workshop.get(nth_workshop - 1)).map(PageShowcase::Workshop)
+                }
+                kind::GUIDES => {
+                    nth_guide += 1;
+                    page.as_ref().and_then(|p| p.guides.get(nth_guide - 1)).map(PageShowcase::Guide)
+                }
+                kind::GAME_COLLECTOR => {
+                    nth_collector += 1;
+                    page.as_ref().and_then(|p| p.collectors.get(nth_collector - 1)).map(PageShowcase::Collector)
+                }
+                kind::REACTIONS => {
+                    nth_awards += 1;
+                    page.as_ref().and_then(|p| p.awards.get(nth_awards - 1)).map(PageShowcase::Awards)
                 }
                 _ => None,
             };
@@ -95,6 +107,9 @@ impl Profile {
                 match from_page {
                     Some(PageShowcase::Completionist(c)) => completionist(ui, t, ctx, c),
                     Some(PageShowcase::Workshop(w)) => my_workshop(ui, t, ctx, w),
+                    Some(PageShowcase::Awards(a)) => awards(ui, t, ctx, a),
+                    Some(PageShowcase::Collector(c)) => collector(ui, t, ctx, c),
+                    Some(PageShowcase::Guide(g)) => guide(ui, t, ctx, g),
                     None => self.showcase_body(ui, t, ctx, id, s),
                 }
             });
@@ -134,7 +149,8 @@ impl Profile {
                     follow(ctx, url);
                 }
             }
-            kind::SCREENSHOTS | kind::ARTWORK | kind::SINGLE_ARTWORK | kind::WORKSHOP | kind::GUIDES => files(ui, t, ctx, s),
+            kind::SCREENSHOTS | kind::ARTWORK | kind::SINGLE_ARTWORK | kind::WORKSHOP => files(ui, t, ctx, s),
+            kind::GUIDES => guide_cards(ui, t, ctx, s),
             kind::ITEMS | kind::TRADE => self.items(ui, t, ctx, id, s),
             kind::BADGES => badge_collector(ui, t, ctx, id, s),
             kind::GAME_COLLECTOR => game_collector(ui, t, ctx, id, s),
@@ -177,10 +193,23 @@ impl Profile {
             ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
             for slot in s.slots.iter().filter(|x| x.asset_id != 0) {
                 let (app, context) = (if slot.app_id == 0 { 753 } else { slot.app_id }, if slot.context_id == 0 { 6 } else { slot.context_id });
-                if !ctx.state.inventories.contains_key(&(id, app, context)) && self.showcase_inventories.insert((id, app, context)) {
+                let key = (id, app, context);
+                let retry = ctx
+                    .state
+                    .inventories
+                    .get(&key)
+                    .is_none_or(|inv| inv.error.is_some());
+                let now = std::time::Instant::now();
+                if retry
+                    && self
+                        .showcase_inventories
+                        .get(&key)
+                        .is_none_or(|last| now.duration_since(*last) >= std::time::Duration::from_secs(5))
+                {
+                    self.showcase_inventories.insert(key, now);
                     ctx.send(Command::LoadInventory { steam_id: id, app_id: app, context_id: context, language: i18n::language().steam_name().into() });
                 }
-                let item = ctx.state.inventories.get(&(id, app, context)).and_then(|inv| inv.items.iter().find(|i| i.asset_id == slot.asset_id)).cloned();
+                let item = ctx.state.inventories.get(&key).and_then(|inv| inv.items.iter().find(|i| i.asset_id == slot.asset_id)).cloned();
                 let (r, resp) = ui.allocate_exact_size(vec2(size, size), Sense::click());
                 ui.painter().rect_filled(r, t.corner_small(), t.raised);
                 match &item {
@@ -195,6 +224,14 @@ impl Profile {
                         if resp.on_hover_text(format!("{}\n{}", item.name, item.kind)).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
                             ctx.navigate("inventory", Some(format!("{id}/{app}")));
                         }
+                    }
+                    None if ctx.state.profile_pages.get(&id).and_then(|p| p.as_ref().ok()).and_then(|p| p.showcase_items.iter().find(|(asset, _)| *asset == slot.asset_id)).is_some() => {
+                        let url = &ctx.state.profile_pages.get(&id).unwrap().as_ref().unwrap().showcase_items.iter().find(|(asset, _)| *asset == slot.asset_id).unwrap().1;
+                        w::image_or_skeleton(ui, t, r.shrink(6.0), url, CornerRadius::same(4));
+                        if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() { ctx.navigate("inventory", Some(format!("{id}/{app}"))); }
+                    }
+                    None if ctx.state.inventories.contains_key(&key) => {
+                        w::placeholder(ui, t, r.shrink(6.0), "", CornerRadius::same(4));
                     }
                     None => w::skeleton(ui, t, r.shrink(6.0), CornerRadius::same(4)),
                 }
@@ -215,6 +252,67 @@ impl Profile {
 enum PageShowcase<'a> {
     Completionist(&'a model::PageCompletionist),
     Workshop(&'a model::PageWorkshop),
+    Awards(&'a model::PageAwards),
+    Collector(&'a model::PageCollector),
+    Guide(&'a model::PageGuide),
+}
+
+fn guide(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, g: &model::PageGuide) {
+    let row = ui.horizontal_top(|ui| {
+        if !g.image.is_empty() {
+            let sized = format!("{}#sir-fit=contain,256x256", g.image);
+            w::picture_fit_width(ui, t, &sized, 160.0, 160.0, 240.0);
+        } else {
+            let (rect, _) = ui.allocate_exact_size(vec2(160.0, 160.0), Sense::hover());
+            w::placeholder(ui, t, rect, "", CornerRadius::ZERO);
+        }
+        ui.vertical(|ui| {
+            ui.label(w::text_semibold(&g.title, 16.0, t.text));
+            if !g.creator.is_empty() { ui.label(w::text(&g.creator, 13.0, t.text_dim)); }
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                if !g.app_icon.is_empty() {
+                    let (r, _) = ui.allocate_exact_size(vec2(32.0, 32.0), Sense::hover());
+                    w::image_or_skeleton(ui, t, r, &g.app_icon, CornerRadius::ZERO);
+                }
+                ui.label(w::text(&g.app, 13.0, t.text));
+                if !g.rating_icon.is_empty() {
+                    let (r, _) = ui.allocate_exact_size(vec2(80.0, 16.0), Sense::hover());
+                    w::image_or_skeleton(ui, t, r, &g.rating_icon, CornerRadius::ZERO);
+                }
+                ui.label(w::text(&g.ratings, 12.0, t.text_dim));
+            });
+            if !g.description.is_empty() { ui.label(w::text(&g.description, 13.0, t.text_dim)); }
+        });
+    }).response.interact(Sense::click());
+    if row.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() { ctx.navigate("workshop_item", Some(g.id.to_string())); }
+}
+
+fn collector(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, collector: &model::PageCollector) {
+    page_stats(ui, t, ctx, &collector.stats);
+    ui.add_space(12.0);
+    ui.label(w::text(t!("Featured Games"), 13.0, t.text_dim));
+    ui.add_space(4.0);
+    let width = ((ui.available_width() - 18.0) / 4.0).max(40.0);
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+        for app in &collector.games { game_header(ui, t, ctx, *app, vec2(width, width * 69.0 / 184.0)); }
+    });
+}
+
+fn awards(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, awards: &model::PageAwards) {
+    ui.horizontal_wrapped(|ui| {
+        for (name, image, count) in &awards.items {
+            ui.vertical(|ui| {
+                let (rect, resp) = ui.allocate_exact_size(vec2(64.0, 64.0), Sense::hover());
+                w::image_or_skeleton(ui, t, rect, image, CornerRadius::ZERO);
+                resp.on_hover_text(name);
+                ui.add(egui::Label::new(w::text(count, 13.0, t.text_dim)));
+            });
+        }
+    });
+    ui.add_space(12.0);
+    page_stats(ui, t, ctx, &awards.stats);
 }
 
 /// The blue rosette Steam puts by a completed achievement set.
@@ -293,7 +391,10 @@ fn my_workshop(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, ws: &model::PageWorkshop) 
             for item in &ws.items {
                 // Each picture at its own shape, like Steam: tall artwork
                 // split across the items lines up as one picture.
-                if w::picture_fit_width(ui, t, &item.image, each, 420.0, 24.0).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+                // Steam may return strips over 30,000 pixels tall. Decode
+                // them to a bounded texture before uploading to the GPU.
+                let sized = format!("{}#sir-fit=contain,256x512", item.image);
+                if w::picture_fit_width(ui, t, &sized, each, 420.0, 240.0).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
                     open = Some(item.id);
                 }
             }
@@ -436,7 +537,8 @@ fn favorite_group(ui: &mut Ui, t: &Theme, g: &model::ShowcaseGroup) {
         let mut open_name = false;
         ui.vertical(|ui| {
             open_name = ui.add(egui::Label::new(w::text(&g.name, 24.0, t.text)).sense(Sense::click())).on_hover_cursor(egui::CursorIcon::PointingHand).clicked();
-            ui.add_space(40.0);
+            if !g.headline.is_empty() { ui.label(w::text(&g.headline, 13.0, t.text_dim)); }
+            ui.add_space(if g.headline.is_empty() { 40.0 } else { 20.0 });
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 26.0;
                 stat(ui, t, &g.members.to_string(), t!("Members"), t.text);
@@ -451,6 +553,23 @@ fn favorite_group(ui: &mut Ui, t: &Theme, g: &model::ShowcaseGroup) {
     });
 }
 
+/// A guide is a compact card, rather than a full-width artwork image.
+fn guide_cards(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, s: &Showcase) {
+    for f in s.slots.iter().filter_map(|slot| slot.file.as_ref()) {
+        let row = ui.horizontal(|ui| {
+            let (rect, _) = ui.allocate_exact_size(vec2(120.0, 90.0), Sense::hover());
+            if let Some(url) = &f.image { w::image_or_skeleton(ui, t, rect, url, CornerRadius::ZERO); }
+            ui.vertical(|ui| {
+                ui.label(w::text_semibold(&f.title, 14.0, t.text));
+                if let Some(name) = ctx.state.app_name(f.app_id) { ui.label(w::text(name, 13.0, t.text_dim)); }
+            });
+        }).response.interact(Sense::click());
+        if row.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+            ctx.navigate("workshop_item", Some(f.id.to_string()));
+        }
+    }
+}
+
 /// Screenshots, artwork, workshop items and guides: the first large, then a row.
 fn files(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, s: &Showcase) {
     let list: Vec<&model::ShowcaseFile> = s.slots.iter().filter_map(|x| x.file.as_ref()).collect();
@@ -462,7 +581,9 @@ fn files(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, s: &Showcase) {
         // capped at 24 fps), the rest in a row below.
         if let Some(first) = list.first() {
             if let Some(url) = &first.image {
-                let resp = w::picture_fit_width(ui, t, url, width, 900.0, 24.0);
+                // Full width at its own height, however tall, like Steam
+                // (artwork comes in any shape).
+                let resp = w::picture_fit_width(ui, t, url, width, 6000.0, 24.0);
                 if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
                     open = Some(first.id);
                 }

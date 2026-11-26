@@ -73,6 +73,7 @@ pub fn in_app(url: &str) -> Option<(String, Option<String>)> {
                 Some("badges") => "/badges",
                 Some("recommended" | "reviews") => "/reviews",
                 Some("groups") => "/groups",
+                Some("groupscommon") => "/groupscommon",
                 _ => "",
             };
             let who = if kind.eq_ignore_ascii_case("id") { format!("id:{who}") } else { who.parse::<u64>().ok()?.to_string() };
@@ -711,6 +712,7 @@ mod tests {
         assert_eq!(page("https://steamcommunity.com/profiles/76561198000000001"), p("profile", "76561198000000001"));
         // Custom profile URLs keep their name's case for Steam to resolve.
         assert_eq!(page("https://steamcommunity.com/id/MissColourz/"), p("profile", "id:MissColourz"));
+        assert_eq!(page("https://steamcommunity.com/id/yayazzli/groupscommon/"), p("profile", "id:yayazzli/groupscommon"));
         assert_eq!(page("https://www.steamcommunity.com/id/x/games/?tab=all"), p("profile", "id:x/games"));
         assert_eq!(page("https://store.steampowered.com/app/570/Dota_2/"), p("store", "app:570"));
         assert_eq!(page("https://steamcommunity.com/sharedfiles/filedetails/?id=123"), p("workshop_item", "123"));
