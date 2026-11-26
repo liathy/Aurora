@@ -29,8 +29,8 @@ fn title_of(s: &Showcase) -> String {
         kind::CUSTOM_TEXT => s.slots.first().map(|x| x.title.trim().to_string()).filter(|x| !x.is_empty()).unwrap_or_else(|| t!("Custom Info Box").to_string()),
         kind::FAVORITE_GROUP => t!("Favorite Group").to_string(),
         kind::REVIEW => t!("Review Showcase").to_string(),
-        kind::WORKSHOP => t!("Workshop Showcase").to_string(),
-        kind::MY_WORKSHOP => t!("My Workshop Showcase").to_string(),
+        // Steam titles both "Workshop Showcase".
+        kind::WORKSHOP | kind::MY_WORKSHOP => t!("Workshop Showcase").to_string(),
         kind::ARTWORK | kind::SINGLE_ARTWORK => t!("Artwork Showcase").to_string(),
         kind::VIDEO => t!("Video Showcase").to_string(),
         kind::GUIDES => t!("Guide Showcase").to_string(),
@@ -39,7 +39,7 @@ fn title_of(s: &Showcase) -> String {
         kind::GREENLIGHT | kind::MY_GREENLIGHT => t!("Greenlight Showcase").to_string(),
         kind::SALIEN => t!("Saliens Showcase").to_string(),
         kind::REACTIONS => t!("Points Shop Reactions").to_string(),
-        kind::COMPLETIONIST => t!("Achievement Completionist").to_string(),
+        kind::COMPLETIONIST => t!("Completionist Showcase").to_string(),
         kind::REPLAY => t!("Steam Replay").to_string(),
         _ => t!("Showcase").to_string(),
     }
@@ -63,8 +63,27 @@ impl Profile {
                 return;
             }
         };
+        // Completionist and Workshop showcases as Steam's page draws them
+        // (game headers, workshop pictures and stats only it has), matched
+        // to the showcases by their order on the page.
+        let page = match ctx.state.profile_pages.get(&id) {
+            Some(Ok(p)) => Some(p.clone()),
+            _ => None,
+        };
+        let (mut nth_completionist, mut nth_workshop) = (0, 0);
         for s in &list {
-            if !self.has_content(ctx, id, s) {
+            let from_page = match s.kind {
+                kind::COMPLETIONIST => {
+                    nth_completionist += 1;
+                    page.as_ref().and_then(|p| p.completionist.get(nth_completionist - 1)).filter(|c| !c.games.is_empty()).map(PageShowcase::Completionist)
+                }
+                kind::MY_WORKSHOP => {
+                    nth_workshop += 1;
+                    page.as_ref().and_then(|p| p.workshop.get(nth_workshop - 1)).map(PageShowcase::Workshop)
+                }
+                _ => None,
+            };
+            if from_page.is_none() && !self.has_content(ctx, id, s) {
                 continue;
             }
             panel(ui, t, |ui| {
@@ -73,7 +92,11 @@ impl Profile {
                     super::section_title(ui, t, &title_of(s));
                     ui.add_space(8.0);
                 }
-                self.showcase_body(ui, t, ctx, id, s);
+                match from_page {
+                    Some(PageShowcase::Completionist(c)) => completionist(ui, t, ctx, c),
+                    Some(PageShowcase::Workshop(w)) => my_workshop(ui, t, ctx, w),
+                    None => self.showcase_body(ui, t, ctx, id, s),
+                }
             });
             ui.add_space(4.0);
         }
@@ -184,6 +207,128 @@ impl Profile {
                 follow(ctx, url);
             }
         }
+    }
+}
+
+/// A showcase read from Steam's profile page.
+#[derive(Clone, Copy)]
+enum PageShowcase<'a> {
+    Completionist(&'a model::PageCompletionist),
+    Workshop(&'a model::PageWorkshop),
+}
+
+/// The blue rosette Steam puts by a completed achievement set.
+const RIBBON: Color32 = Color32::from_rgb(76, 160, 240);
+
+/// Steam's Completionist Showcase: the games' headers two to a row, each
+/// with its ribbon, achievement count and rare count under it, then the
+/// stats row (completed games, completed sets, average completion).
+fn completionist(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, c: &model::PageCompletionist) {
+    const GAP: f32 = 8.0;
+    const BAR_H: f32 = 44.0;
+    let width = ui.available_width();
+    let each = ((width - GAP) / 2.0).floor();
+    // Steam's header pictures are 460×215.
+    let pic_h = (each * 215.0 / 460.0).round();
+    let mut open = None;
+    for row in c.games.chunks(2) {
+        ui.horizontal_top(|ui| {
+            ui.spacing_mut().item_spacing.x = GAP;
+            for g in row {
+                let (r, resp) = ui.allocate_exact_size(vec2(each, pic_h + BAR_H), Sense::click());
+                let pic = Rect::from_min_size(r.min, vec2(each, pic_h));
+                let image = if g.image.is_empty() { art::header(g.app_id) } else { g.image.clone() };
+                w::image_or_skeleton(ui, t, pic, &image, CornerRadius::ZERO);
+                let bar = Rect::from_min_max(pos2(r.left(), pic.bottom()), r.max);
+                let p = ui.painter();
+                p.text(pos2(bar.left() + 18.0, bar.center().y), Align2::CENTER_CENTER, icons::MEDAL, w::font(24.0), RIBBON);
+                let right = bar.right() - 8.0;
+                if g.rare.is_empty() {
+                    p.text(pos2(right, bar.center().y), Align2::RIGHT_CENTER, &g.achievements, w::font_bold(14.0), Color32::WHITE);
+                } else {
+                    p.text(pos2(right, bar.center().y + 1.0), Align2::RIGHT_BOTTOM, &g.achievements, w::font_bold(14.0), Color32::WHITE);
+                    p.text(pos2(right, bar.center().y + 2.0), Align2::RIGHT_TOP, &g.rare, w::font_bold(10.5), t.text_dim);
+                }
+                if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+                    open = Some(g.url.clone());
+                }
+            }
+        });
+        ui.add_space(4.0);
+    }
+    if !c.stats.is_empty() {
+        ui.add_space(14.0);
+        page_stats(ui, t, ctx, &c.stats);
+    }
+    if open.is_some() {
+        follow(ctx, open);
+    }
+}
+
+/// Steam's Workshop Showcase: the owner's avatar and workshop name, their
+/// items side by side at their own shape, then submissions and followers.
+fn my_workshop(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, ws: &model::PageWorkshop) {
+    let mut open_url = None;
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 10.0;
+        let (r, resp) = ui.allocate_exact_size(vec2(36.0, 36.0), Sense::click());
+        ui.painter().rect_filled(r, CornerRadius::ZERO, t.text_faint);
+        match &ws.avatar {
+            Some(u) => w::image_or_skeleton(ui, t, r.shrink(1.0), u, CornerRadius::ZERO),
+            None => w::skeleton(ui, t, r.shrink(1.0), CornerRadius::ZERO),
+        }
+        let name = ui.add(egui::Label::new(w::text(&ws.title, 22.0, t.text)).sense(Sense::click()));
+        if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() || name.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+            open_url = Some(ws.url.clone());
+        }
+    });
+    if !ws.items.is_empty() {
+        ui.add_space(24.0);
+        const GAP: f32 = 4.0;
+        let n = ws.items.len() as f32;
+        let each = ((ui.available_width() - GAP * (n - 1.0)) / n).floor();
+        let mut open = None;
+        ui.horizontal_top(|ui| {
+            ui.spacing_mut().item_spacing.x = GAP;
+            for item in &ws.items {
+                // Each picture at its own shape, like Steam: tall artwork
+                // split across the items lines up as one picture.
+                if w::picture_fit_width(ui, t, &item.image, each, 420.0, 24.0).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+                    open = Some(item.id);
+                }
+            }
+        });
+        if let Some(id) = open {
+            ctx.navigate("workshop_item", Some(id.to_string()));
+        }
+    }
+    if !ws.stats.is_empty() {
+        ui.add_space(14.0);
+        page_stats(ui, t, ctx, &ws.stats);
+    }
+    if open_url.as_deref().is_some_and(|u| !u.is_empty()) {
+        follow(ctx, open_url);
+    }
+}
+
+/// A stats row from Steam's page; stats with a link open it.
+fn page_stats(ui: &mut Ui, t: &Theme, ctx: &mut Ctx, list: &[model::PageStat]) {
+    let mut open = None;
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 48.0;
+        for s in list {
+            let r = ui.scope(|ui| stat(ui, t, &s.value, &s.label, t.text)).response;
+            let mut resp = ui.interact(r.rect, ui.id().with(("page_stat", &s.label)), if s.url.is_empty() { Sense::hover() } else { Sense::click() });
+            if !s.tooltip.is_empty() {
+                resp = resp.on_hover_text(&s.tooltip);
+            }
+            if !s.url.is_empty() && resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+                open = Some(s.url.clone());
+            }
+        }
+    });
+    if open.is_some() {
+        follow(ctx, open);
     }
 }
 

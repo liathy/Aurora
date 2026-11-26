@@ -311,6 +311,11 @@ impl Extension for Profile {
                     ui.spacing_mut().item_spacing = vec2(8.0, 4.0);
                     {
                                 let name = if mine && !ctx.state.persona_name.is_empty() { ctx.state.persona_name.clone() } else { persona.name.clone() };
+                                // Steam's `profile_header_centered_persona`: the
+                                // name and the real name / location line, with
+                                // 18 px under it before the summary (the same
+                                // when there's no location line).
+                                let persona_block = ui.vertical(|ui| {
                                 ui.horizontal(|ui| {
                                     ui.label(w::text(name, 30.0, Color32::WHITE));
                                     // Steam's chevron: the names this profile used before.
@@ -346,7 +351,9 @@ impl Extension for Profile {
                                     let (r, _) = ui.allocate_exact_size(vec2(220.0, 14.0), Sense::hover());
                                     w::skeleton(ui, &t, r, CornerRadius::same(4));
                                 }
-                                ui.add_space(10.0);
+                                }).response.rect;
+                                let gap = persona_block.bottom() + PERSONA_PADDING_BOTTOM - ui.cursor().top();
+                                ui.add_space(gap.max(0.0));
                                 match info.as_ref().map(|i| i.summary.trim().to_string()) {
                                     Some(s) if !s.is_empty() => {
                                         // Steam's BBCode, emoticons and emoji, like the real profile.
@@ -843,6 +850,9 @@ const PAGE_W: f32 = 976.0;
 const GUTTER: f32 = 12.0;
 const RIGHT_W: f32 = 288.0;
 const HEADER_H: f32 = 230.0;
+/// Space under the name and location before the summary (Steam's
+/// `.profile_header_centered_persona { padding-bottom: 18px }`).
+const PERSONA_PADDING_BOTTOM: f32 = 18.0;
 
 /// The border behind a profile picture without a frame, in Steam's status
 /// colors (dimmed, as its gradient border reads).

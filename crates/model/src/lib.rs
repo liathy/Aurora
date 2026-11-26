@@ -868,6 +868,63 @@ pub struct ProfilePage {
     /// `steam://joinlobby/381210/<lobby>/<owner>`); "" when there's none.
     #[serde(default)]
     pub join_link: String,
+    /// Completionist showcases as the page draws them, in page order.
+    #[serde(default)]
+    pub completionist: Vec<PageCompletionist>,
+    /// Workshop showcases as the page draws them, in page order.
+    #[serde(default)]
+    pub workshop: Vec<PageWorkshop>,
+}
+
+/// Steam's Completionist Showcase: game headers with their achievement
+/// counts, and the stats row under them.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PageCompletionist {
+    pub games: Vec<PageCompletedGame>,
+    /// ("10", "Completed Games"), ("38%", "Avg. Game Completion Rate")…
+    pub stats: Vec<PageStat>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PageCompletedGame {
+    pub app_id: AppId,
+    /// The game's header picture (460×215).
+    pub image: String,
+    /// e.g. "49 Achievements".
+    pub achievements: String,
+    /// e.g. "10 RARE"; "" when none.
+    pub rare: String,
+    /// The profile's achievements page for this game.
+    pub url: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PageStat {
+    pub value: String,
+    pub label: String,
+    /// Where the stat links to; "" when it doesn't.
+    pub url: String,
+    pub tooltip: String,
+}
+
+/// Steam's Workshop Showcase: the owner's workshop header, their newest
+/// items and the stats row.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PageWorkshop {
+    /// e.g. "Another Duck's Workshop".
+    pub title: String,
+    pub url: String,
+    pub avatar: Option<String>,
+    pub items: Vec<PageWorkshopItem>,
+    pub stats: Vec<PageStat>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PageWorkshopItem {
+    pub id: u64,
+    pub app_id: AppId,
+    /// The item's preview at its own shape.
+    pub image: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]

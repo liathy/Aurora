@@ -278,7 +278,88 @@ pub fn parse(html: &str) -> ProfilePage {
         });
         page.recent.push(RecentGame { app_id, name, capsule, details, achievements, rare, progress, icons, more, screenshots, badge, review, review_url });
     }
+    page.completionist = completionist(html);
+    page.workshop = workshop(html);
     page
+}
+
+/// The number at the end of `…/<marker><digits>`.
+fn number_after(s: &str, marker: &str) -> u64 {
+    after(s, marker).and_then(|s| s.split(|c: char| !c.is_ascii_digit()).next()?.parse().ok()).unwrap_or(0)
+}
+
+/// A showcase's stats row: `<a|div class="showcase_stat" …><div class="value">…</div><div class="label">…</div>`.
+fn stats(block: &str) -> Vec<model::PageStat> {
+    let Some(row) = after(block, "showcase_stats_row") else { return Vec::new() };
+    blocks(row, "class=\"showcase_stat\"")
+        .into_iter()
+        .filter_map(|s| {
+            // The opening tag (attributes after the class) and the one before it
+            // (attributes before the class).
+            let open = &s[..s.find('>').unwrap_or(s.len())];
+            let value = between(s, "class=\"value\">", "</div>").map(text)?;
+            let label = between(s, "class=\"label\">", "</div>").map(text).unwrap_or_default();
+            Some(model::PageStat {
+                value,
+                label,
+                url: attr(open, "href").map(decode).unwrap_or_default(),
+                tooltip: attr(open, "data-tooltip-text").map(decode).unwrap_or_default(),
+            })
+        })
+        .collect()
+}
+
+/// Every Completionist Showcase on the page.
+fn completionist(html: &str) -> Vec<model::PageCompletionist> {
+    blocks(html, "class=\"showcase_achievementscompletionist_games\"")
+        .into_iter()
+        .map(|b| {
+            let b = &b[..b.find("class=\"profile_customization").unwrap_or(b.len())];
+            let games = blocks(b, "showcase_achievementscompletionist_game ")
+                .into_iter()
+                .filter_map(|g| {
+                    let url = after(g, "<a ").and_then(|a| attr(a, "href")).unwrap_or_default().to_string();
+                    let app_id = number_after(&url, "/achievements/") as model::AppId;
+                    let image = after(g, "class=\"game_capsule\"").and_then(|s| attr(s, "src")).unwrap_or_default().to_string();
+                    (app_id != 0).then(|| model::PageCompletedGame {
+                        app_id,
+                        image,
+                        achievements: between(g, "class=\"num_achievements\">", "</div>").map(text).unwrap_or_default(),
+                        rare: between(g, "class=\"subtitle\">", "</div>").map(text).unwrap_or_default(),
+                        url,
+                    })
+                })
+                .collect();
+            model::PageCompletionist { games, stats: stats(b) }
+        })
+        .collect()
+}
+
+/// Every Workshop Showcase on the page.
+fn workshop(html: &str) -> Vec<model::PageWorkshop> {
+    blocks(html, "class=\"myworkshop_showcase_header\"")
+        .into_iter()
+        .map(|b| {
+            let b = &b[..b.find("class=\"profile_customization\"").unwrap_or(b.len())];
+            let avatar = after(b, "<img").and_then(|i| attr(i, "src")).filter(|s| s.starts_with("https://")).map(String::from);
+            let name = after(b, "class=\"myworkshop_playerName\"").unwrap_or_default();
+            let title = name.split_once('>').map(|x| text(&x.1[..x.1.find("</a>").unwrap_or(x.1.len())])).unwrap_or_default();
+            let url = b.find("class=\"myworkshop_playerName\"").and_then(|i| b[..i].rfind("<a ").map(|a| &b[a..])).and_then(|a| attr(a, "href")).unwrap_or_default().to_string();
+            let items = blocks(b, "class=\"workshop_showcase_multiitem")
+                .into_iter()
+                .filter_map(|it| {
+                    let id = attr(it, "data-publishedfileid").and_then(|v| v.parse().ok())?;
+                    let app_id = attr(it, "data-appid").and_then(|v| v.parse().ok()).unwrap_or(0);
+                    // Steam asks for a 150 px letterboxed square; ask for the
+                    // picture at its own shape instead.
+                    let src = after(it, "class=\"workshop_showcase_item_image\"").and_then(|s| attr(s, "src")).filter(|s| s.starts_with("https://"))?;
+                    let base = decode(src).split('?').next().unwrap_or_default().to_string();
+                    Some(model::PageWorkshopItem { id, app_id, image: format!("{base}?imw=320&ima=fit&impolicy=Letterbox&letterbox=false") })
+                })
+                .collect();
+            model::PageWorkshop { title, url, avatar, items, stats: stats(b) }
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -353,5 +434,48 @@ Member since 23 November, 2014."><a href="https://steamcommunity.com/id/x/badges
         assert_eq!(p.groups_in_common, r#"You have <a class="whiteLink" href="https://steamcommunity.com/id/x/groupscommon/">1 group</a> in common"#);
         assert_eq!(p.friends_in_common, "");
         assert_eq!(p.join_link, "steam://joinlobby/381210/109775241333656222/76561198164781205");
+        assert!(p.completionist.is_empty() && p.workshop.is_empty());
+    }
+
+    // Trimmed from steamcommunity.com profiles with these showcases.
+    const SHOWCASES: &str = r#"
+<div class="profile_customization"><div class="profile_customization_header">Workshop Showcase</div>
+<div class="myworkshop_showcase_header"><div class="playerAvatar offline"><a href="https://steamcommunity.com/id/duck" data-miniprofile="187134506"><img src="https://avatars.example/duck.jpg"></a></div>
+<a href="https://steamcommunity.com/id/duck/myworkshopfiles/" class="myworkshop_playerName"> Another Duck's Workshop </a></div>
+<div class="profile_customization_block"><div class="myworkshop_showcase"><div class="workshop_showcase_mutiitem_ctn"><div class="workshop_showcase_multiitem showcase_slot " >
+<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=1201908955" title="0" class="ugc" data-appid="767" data-publishedfileid="1201908955"><img class="workshop_showcase_item_image" src="https://images.example/ugc/1/ABC/?imw=150&imh=150&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=true"></a></div></div>
+<div class="workshop_showcase_mutiitem_ctn"><div class="workshop_showcase_multiitem showcase_slot " ><a href="x" class="ugc" data-appid="767" data-publishedfileid="1201909925"><img class="workshop_showcase_item_image" src="https://images.example/ugc/2/DEF/?imw=150"></a></div></div>
+<div class="showcase_stats_row showcase_content_bg"><a class="showcase_stat" href="https://steamcommunity.com/id/duck/myworkshopfiles/"><div class="value">4</div><div class="label">Submissions</div></a>
+<div class="showcase_stat"><div class="value">1</div><div class="label">Followers</div></div></div></div></div></div>
+<div class="profile_customization"><div class="profile_customization_header">Completionist Showcase</div><div class="profile_customization_block"><div class="showcase_achievementscompletionist_games"><div class="showcase_content_bg showcase_achievementscompletionist_slots">
+<div class="showcase_slot showcase_achievementscompletionist_game  " ><a href="https://steamcommunity.com/profiles/1/achievements/814380"><img class="game_capsule" src="https://cdn.example/814380/header.jpg?t=1"><div class="showcase_achievementscompletionist_game_bar"><div class="showcase_achievementscompletionist_game_counts"><div class="num_achievements">34 Achievements</div></div></div></a></div>
+<div class="showcase_slot showcase_achievementscompletionist_game  app_has_adult_content" ><a href="https://steamcommunity.com/profiles/1/achievements/1145360"><img class="game_capsule" src="https://cdn.example/1145360/header.jpg"><div class="showcase_achievementscompletionist_game_bar"><div class="showcase_achievementscompletionist_game_counts"><div class="num_achievements">49 Achievements</div><div class="subtitle">10 RARE</div></div></div></a></div>
+</div><div class="showcase_content_bg showcase_stats_row">
+<a class="showcase_stat" href="https://steamcommunity.com/profiles/1/games/?tab=perfect" data-tooltip-text="Games where this player has completed every available achievement set." ><div class="value">10</div><div class="label">Completed Games</div></a>
+<a class="showcase_stat" href="https://steamcommunity.com/profiles/1/games/?tab=all&amp;sort=achievements" data-tooltip-text="The average percentage of achievements earned per game." ><div class="value">38%</div><div class="label">Avg. Game Completion Rate</div></a></div></div></div></div>
+"#;
+
+    #[test]
+    fn reads_completionist_and_workshop_showcases() {
+        let p = super::parse(SHOWCASES);
+        assert_eq!(p.completionist.len(), 1);
+        let c = &p.completionist[0];
+        let games: Vec<(u32, &str, &str)> = c.games.iter().map(|g| (g.app_id, g.achievements.as_str(), g.rare.as_str())).collect();
+        assert_eq!(games, [(814380, "34 Achievements", ""), (1145360, "49 Achievements", "10 RARE")]);
+        assert_eq!(c.games[0].image, "https://cdn.example/814380/header.jpg?t=1");
+        assert_eq!(c.games[1].url, "https://steamcommunity.com/profiles/1/achievements/1145360");
+        let stats: Vec<(&str, &str)> = c.stats.iter().map(|s| (s.value.as_str(), s.label.as_str())).collect();
+        assert_eq!(stats, [("10", "Completed Games"), ("38%", "Avg. Game Completion Rate")]);
+        assert_eq!(c.stats[1].url, "https://steamcommunity.com/profiles/1/games/?tab=all&sort=achievements");
+        assert!(c.stats[0].tooltip.starts_with("Games where"));
+
+        assert_eq!(p.workshop.len(), 1);
+        let w = &p.workshop[0];
+        assert_eq!((w.title.as_str(), w.url.as_str()), ("Another Duck's Workshop", "https://steamcommunity.com/id/duck/myworkshopfiles/"));
+        assert_eq!(w.avatar.as_deref(), Some("https://avatars.example/duck.jpg"));
+        assert_eq!(w.items.iter().map(|i| (i.id, i.app_id)).collect::<Vec<_>>(), [(1201908955, 767), (1201909925, 767)]);
+        assert_eq!(w.items[0].image, "https://images.example/ugc/1/ABC/?imw=320&ima=fit&impolicy=Letterbox&letterbox=false");
+        let stats: Vec<(&str, &str, &str)> = w.stats.iter().map(|s| (s.value.as_str(), s.label.as_str(), s.url.as_str())).collect();
+        assert_eq!(stats, [("4", "Submissions", "https://steamcommunity.com/id/duck/myworkshopfiles/"), ("1", "Followers", "")]);
     }
 }
