@@ -44,11 +44,20 @@ enum Entry {
     Failed(String),
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Blur {
+    None,
+    /// Sharp at the top, blurred toward the bottom (game page backdrops).
+    Bottom,
+    /// Blurred all over (frosted profile panels).
+    All,
+}
+
 struct Job {
     uri: String,
     bytes: egui::load::Bytes,
     cover: bool,
-    blur_bottom: bool,
+    blur: Blur,
     w: u32,
     h: u32,
     ctx: egui::Context,
@@ -95,8 +104,10 @@ fn worker(rx: &Mutex<Receiver<Job>>, entries: &Mutex<HashMap<String, Entry>>) {
             continue;
         }
         let result = decode_with(&job.bytes, job.cover, job.w, job.h, &mut resizer).map(|mut image| {
-            if job.blur_bottom {
-                blur_bottom(&mut image);
+            match job.blur {
+                Blur::None => {}
+                Blur::Bottom => blur_bottom(&mut image),
+                Blur::All => blur_all(&mut image),
             }
             image
         });
@@ -185,14 +196,31 @@ fn blur_bottom(image: &mut ColorImage) {
     }
 }
 
+/// Blur the whole picture strongly (Steam's `backdrop-filter: blur`), on a
+/// quarter-size copy scaled back up.
+fn blur_all(image: &mut ColorImage) {
+    use image::imageops::{self, FilterType};
+    let [w, h] = image.size;
+    let rgba = image::RgbaImage::from_fn(w as u32, h as u32, |x, y| image::Rgba(image.pixels[y as usize * w + x as usize].to_array()));
+    let small = imageops::resize(&rgba, (w as u32 / 4).max(1), (h as u32 / 4).max(1), FilterType::Triangle);
+    let soft = imageops::resize(&imageops::blur(&small, 6.0), w as u32, h as u32, FilterType::Triangle);
+    for (pixel, other) in image.pixels.iter_mut().zip(soft.as_raw().chunks_exact(4)) {
+        *pixel = egui::Color32::from_rgba_premultiplied(other[0], other[1], other[2], other[3]);
+    }
+}
+
 impl ImageLoader for SizedLoader {
     fn id(&self) -> &str {
         egui::generate_loader_id!(SizedLoader)
     }
 
     fn load(&self, ctx: &egui::Context, uri: &str, _: SizeHint) -> ImageLoadResult {
-        let plain = uri.strip_suffix(ui::widgets::BLUR_BOTTOM_SUFFIX);
-        let Some((url, cover, w, h)) = ui::widgets::parse_sized(plain.unwrap_or(uri)) else {
+        let (plain, blur) = match (uri.strip_suffix(ui::widgets::BLUR_BOTTOM_SUFFIX), uri.strip_suffix(ui::widgets::BLUR_SUFFIX)) {
+            (Some(p), _) => (p, Blur::Bottom),
+            (None, Some(p)) => (p, Blur::All),
+            (None, None) => (uri, Blur::None),
+        };
+        let Some((url, cover, w, h)) = ui::widgets::parse_sized(plain) else {
             return Err(LoadError::NotSupported);
         };
         match self.entries.lock().unwrap().get(uri) {
@@ -206,7 +234,7 @@ impl ImageLoader for SizedLoader {
                 let is_anim_webp = bytes.get(8..12) == Some(b"WEBP")
                     && image::codecs::webp::WebPDecoder::new(std::io::Cursor::new(&bytes[..]))
                         .is_ok_and(|d| d.has_animation());
-                let job = Job { uri: uri.to_string(), bytes: bytes.clone(), cover, blur_bottom: plain.is_some(), w, h, ctx: ctx.clone() };
+                let job = Job { uri: uri.to_string(), bytes: bytes.clone(), cover, blur, w, h, ctx: ctx.clone() };
                 self.entries.lock().unwrap().insert(uri.to_string(), Entry::Pending);
                 match self.jobs.lock().unwrap().try_send(job) {
                     Ok(()) => {
