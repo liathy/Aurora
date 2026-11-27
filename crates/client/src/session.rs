@@ -1638,7 +1638,12 @@ async fn online(
                 Some(Command::CancelBuyOrder { order_id }) => st.cancel_buy_order(order_id, sink),
                 Some(Command::LoadPlayerGames { steam_id, language }) => st.load_player_games(steam_id, language, sink),
                 Some(Command::LoadAchievementProgress { app_ids }) => st.load_achievement_progress(app_ids, sink),
-                Some(Command::LoadAchievements { app_id, language }) => st.load_achievements(app_id, language, sink),
+                Some(Command::LoadAchievements { app_id, language }) => st.load_achievements(app_id, language, None, sink),
+                Some(Command::CheckAchievementUnlocks { app_id, language, since, seen }) => {
+                    if st.link == Link::Online && st.running.contains_key(&app_id) {
+                        st.load_achievements(app_id, language, Some((since, seen)), sink);
+                    }
+                }
                 Some(Command::ActivateKey { key }) => st.activate_key(key, sink),
                 Some(Command::Install(req)) => {
                     if storage_busy(storage, req.app_id) {
@@ -2975,33 +2980,63 @@ impl Online {
         });
     }
 
-    fn load_achievements(&self, app_id: AppId, language: String, sink: &Sink) {
+    fn load_achievements(&self, app_id: AppId, language: String, watch: Option<(u64, Vec<u32>)>, sink: &Sink) {
         let (conn, sink, me) = (self.conn.clone(), sink.clone(), self.me);
         tokio::spawn(async move {
-            let schema = conn
-                .call::<_, CPlayerGetGameAchievementsResponse>("Player.GetGameAchievements#1", &CPlayerGetGameAchievementsRequest { appid: Some(app_id), language: Some(language), hash_only: Some(false) })
-                .await;
-            let mine = conn.call::<_, CPlayerGetUserAchievementsResponse>("Player.GetUserAchievements#1", &CPlayerGetUserAchievementsRequest { steamid: Some(me), appid: Some(app_id) }).await;
+            let schema_request = CPlayerGetGameAchievementsRequest { appid: Some(app_id), language: Some(language), hash_only: Some(false) };
+            let user_request = CPlayerGetUserAchievementsRequest { steamid: Some(me), appid: Some(app_id) };
+            let get_schema = conn.call::<_, CPlayerGetGameAchievementsResponse>("Player.GetGameAchievements#1", &schema_request);
+            let get_unlocks = async {
+                conn.call::<_, CPlayerGetUserAchievementsResponse>("Player.GetUserAchievements#1", &user_request)
+                    .await
+                    .map(|m| m.achievements.iter().filter(|a| a.unlocked()).map(|a| (a.internal_key(), a.unlock_time() as u64)).collect::<HashMap<_, _>>())
+                    .unwrap_or_default()
+            };
+            let is_new = |key: u32, time: u64| {
+                watch.as_ref().is_some_and(|(since, seen)| time != 0 && time >= *since && !seen.contains(&key))
+            };
+            let (schema, unlocked) = if watch.is_some() {
+                let unlocked = get_unlocks.await;
+                if !unlocked.iter().any(|(&key, &time)| is_new(key, time)) {
+                    return;
+                }
+                (get_schema.await, unlocked)
+            } else {
+                tokio::join!(get_schema, get_unlocks)
+            };
             let result = match schema {
+                Err(_) if watch.is_some() => return,
                 Err(e) => Err(e.to_string()),
                 Ok(schema) => {
-                    let unlocked: HashMap<u32, u64> = mine.map(|m| m.achievements.iter().filter(|a| a.unlocked()).map(|a| (a.internal_key(), a.unlock_time() as u64)).collect()).unwrap_or_default();
                     let image = |file: &str| if file.is_empty() { String::new() } else { format!("https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/{app_id}/{file}") };
-                    Ok(schema
+                    let mut achievements = Vec::new();
+                    let list = schema
                         .achievements
                         .iter()
                         .filter(|a| !a.archived())
-                        .map(|a| model::Achievement {
-                            name: a.localized_name().to_string(),
-                            description: a.localized_desc().to_string(),
-                            icon: image(a.icon()),
-                            icon_gray: image(a.icon_gray()),
-                            hidden: a.hidden(),
-                            unlocked: unlocked.contains_key(&a.internal_key()),
-                            unlock_time: unlocked.get(&a.internal_key()).copied().unwrap_or(0),
-                            global_percent: a.player_percent_unlocked().parse().unwrap_or(0.0),
+                        .map(|a| {
+                            let key = a.internal_key();
+                            let achievement = model::Achievement {
+                                name: a.localized_name().to_string(),
+                                description: a.localized_desc().to_string(),
+                                icon: image(a.icon()),
+                                icon_gray: image(a.icon_gray()),
+                                hidden: a.hidden(),
+                                unlocked: unlocked.contains_key(&key),
+                                unlock_time: unlocked.get(&key).copied().unwrap_or(0),
+                                global_percent: a.player_percent_unlocked().parse().unwrap_or(0.0),
+                            };
+                            if is_new(key, achievement.unlock_time) {
+                                achievements.push((key, achievement.clone()));
+                            }
+                            achievement
                         })
-                        .collect())
+                        .collect();
+                    if let Some((since, _)) = &watch {
+                        achievements.sort_by_key(|(key, a)| (a.unlock_time, *key));
+                        sink(Event::AchievementUnlocks { app_id, since: *since, achievements });
+                    }
+                    Ok(list)
                 }
             };
             sink(Event::Achievements { app_id, result });
@@ -3180,7 +3215,9 @@ impl Online {
                 tokio::task::spawn_blocking(move || {
                     let started = || sink(Event::GameStarted { app_id });
                     let ov = overlay.as_ref().map(|(p, t)| (*p, t.as_str()));
-                    let cloud_dir = match launch::run_through_host_cancellable(&app, &dir2, &args, &account, &token, me, ov, Some(&stop_flag), started) {
+                    let overlay_sink = sink.clone();
+                    let profile = move |target: SteamId| overlay_sink(Event::GameOverlay { app_id, dialog: "user:steamid".into(), target: target.to_string() });
+                    let cloud_dir = match launch::run_through_host_cancellable(&app, &dir2, &args, &account, &token, me, ov, Some(&stop_flag), started, profile) {
                         Ok(()) if !steam_drm => Some(dir2),
                         Ok(()) => None,
                         Err(e) => {
@@ -3391,6 +3428,12 @@ impl Online {
                     }
                     let _ = reply.send(Reply::Stored { eresult, crc });
                 });
+            }
+            Request::AchievementsUnlocked { unlocks } => {
+                if self.running.contains_key(&app_id) && self.launch_tokens.get(&app_id) == Some(&token) {
+                    emit_stored_achievements(_sink, app_id, unlocks);
+                }
+                let _ = reply.send(Reply::Ok);
             }
             Request::SteamDrm => {
                 let _ = reply.send(Reply::Ok);
@@ -4068,6 +4111,24 @@ impl Online {
                 }
             }
         });
+    }
+}
+
+fn emit_stored_achievements(sink: &Sink, app_id: AppId, unlocks: Vec<crate::ipc::protocol::AchievementToast>) {
+    let achievements: Vec<_> = unlocks.into_iter().filter_map(|a| {
+        let name: String = a.title.chars().filter(|c| !c.is_control()).take(256).collect();
+        if name.trim().is_empty() {
+            return None;
+        }
+        let icon = a.icon.rsplit('/').next().filter(|s| !s.is_empty() && s.len() <= 80
+            && s.bytes().all(|c| c.is_ascii_alphanumeric() || matches!(c, b'.' | b'_' | b'-'))
+            && !matches!(*s, "." | ".."))
+            .map(|file| format!("https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/{app_id}/{file}"))
+            .unwrap_or_default();
+        Some(model::Achievement { name, icon, unlocked: true, ..Default::default() })
+    }).collect();
+    if !achievements.is_empty() {
+        sink(Event::GameAchievementsUnlocked { app_id, achievements });
     }
 }
 

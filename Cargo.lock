@@ -5391,6 +5391,7 @@ name = "steamhost"
 version = "1.0.0-rc5"
 dependencies = [
  "libc",
+ "sha2",
 ]
 
 [[package]]

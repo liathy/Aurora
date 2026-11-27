@@ -295,6 +295,7 @@ pub enum Command {
     LoadAchievementProgress { app_ids: Vec<AppId> },
     /// A game's achievements with which ones you've unlocked.
     LoadAchievements { app_id: AppId, language: String },
+    CheckAchievementUnlocks { app_id: AppId, language: String, since: u64, seen: Vec<u32> },
     /// Redeem a product key (CD key).
     ActivateKey { key: String },
     /// Install or update a game (queued; one download runs at a time).
@@ -493,6 +494,7 @@ impl std::fmt::Debug for Command {
             Command::LoadPlayerGames { steam_id, language } => f.debug_struct("LoadPlayerGames").field("steam_id", steam_id).field("language", language).finish(),
             Command::LoadAchievementProgress { app_ids } => f.debug_struct("LoadAchievementProgress").field("app_ids", app_ids).finish(),
             Command::LoadAchievements { app_id, language } => f.debug_struct("LoadAchievements").field("app_id", app_id).field("language", language).finish(),
+            Command::CheckAchievementUnlocks { app_id, .. } => f.debug_struct("CheckAchievementUnlocks").field("app_id", app_id).finish(),
             Command::ActivateKey { .. } => f.debug_struct("ActivateKey").field("key", &"[REDACTED]").finish(),
             Command::Install(req) => f.debug_tuple("Install").field(req).finish(),
             Command::PauseDownload { app_id } => f.debug_struct("PauseDownload").field("app_id", app_id).finish(),
@@ -702,6 +704,8 @@ pub enum Event {
     /// Your achievement progress: (game, unlocked, total).
     AchievementProgress(Vec<(AppId, u32, u32)>),
     Achievements { app_id: AppId, result: Result<Vec<model::Achievement>, String> },
+    AchievementUnlocks { app_id: AppId, since: u64, achievements: Vec<(u32, model::Achievement)> },
+    GameAchievementsUnlocked { app_id: AppId, achievements: Vec<model::Achievement> },
     /// Result of [`Command::ActivateKey`]: `Ok(items)` or `Err(reason)`.
     KeyActivated(Result<Vec<String>, String>),
     Download(model::DownloadStatus),

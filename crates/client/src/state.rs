@@ -413,6 +413,7 @@ impl State {
                 }
                 self.achievement_list.insert(*app_id, result.clone());
             }
+            Event::AchievementUnlocks { .. } | Event::GameAchievementsUnlocked { .. } => {}
             Event::AchievementProgress(list) => {
                 for (app, unlocked, total) in list {
                     self.achievements.insert(*app, (*unlocked, *total));

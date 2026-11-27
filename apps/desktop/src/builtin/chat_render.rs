@@ -181,8 +181,10 @@ pub fn render_message_text(
                     .clone()
                     .on_hover_cursor(egui::CursorIcon::PointingHand)
                     .on_hover_text(&url);
-                if no_drag && link_resp.clicked() {
-                    links::open_http(&url);
+                if no_drag && link_resp.clicked()
+                    && let Some(url) = links::validate_http_url(&url)
+                {
+                    ui.ctx().open_url(egui::OpenUrl::new_tab(url.as_str()));
                 }
                 return link_resp;
             }
@@ -347,7 +349,9 @@ pub fn render_media(ui: &mut Ui, t: &Theme, text: &str, media: &[ChatMedia]) {
                             .on_hover_cursor(egui::CursorIcon::PointingHand)
                             .on_hover_text(&m.url);
                         if chip.clicked() {
-                            links::open_http(&m.url);
+                            if let Some(url) = links::validate_http_url(&m.url) {
+                                ui.ctx().open_url(egui::OpenUrl::new_tab(url.as_str()));
+                            }
                         }
                         media_context_menu(chip, &m.url);
                     }

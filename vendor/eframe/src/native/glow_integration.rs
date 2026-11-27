@@ -41,7 +41,10 @@ use super::{
 use crate::epaint::textures::TexturesDelta;
 use crate::{
     App, AppCreator, CreationContext, NativeOptions, Result, Storage,
-    native::{epi_integration::EpiIntegration, winit_integration::sleep_if_invisible_or_minimized},
+    native::{
+        epi_integration::EpiIntegration,
+        winit_integration::{is_invisible_or_minimized, sleep_if_invisible_or_minimized},
+    },
 };
 
 // ----------------------------------------------------------------------------
@@ -810,10 +813,17 @@ impl GlowWinitRunning<'_> {
                 .actions_requested
                 .iter()
                 .any(egui_winit::ActionRequested::wants_paint);
+            let wants_pixels = wants_paint
+                && (viewport_id != ViewportId::ROOT
+                    || viewport.actions_requested.iter().any(|action| {
+                        matches!(action, egui_winit::ActionRequested::Screenshot(_))
+                    }));
             // A hidden window is not painted, since nothing would be shown — unless someone
             // wants the pixels anyway, e.g. to screenshot an app that is in the background:
-            let is_visible = (mode == PassMode::Full && viewport.info.visible().unwrap_or(true))
-                || wants_paint;
+            let is_visible = (mode == PassMode::Full
+                && !is_invisible_or_minimized(window)
+                && viewport.info.visible().unwrap_or(true))
+                || wants_pixels;
 
             let Some(egui_winit) = viewport.egui_winit.as_mut() else {
                 return Ok(EventResult::Wait);
@@ -825,13 +835,20 @@ impl GlowWinitRunning<'_> {
             // while covered by a maximized child window like Friends & Chat), still run the
             // full UI pass whenever a child immediate viewport is visible so that child
             // window keeps painting.
+            if wants_paint && !is_visible {
+                // Run the root UI to manage child windows without presenting
+                // a buffer for a minimized or tray-hidden window.
+                viewport.actions_requested.retain(|action| {
+                    !matches!(action, egui_winit::ActionRequested::PaintWhileHidden)
+                });
+            }
             let has_visible_descendant = glutin.viewports.values().any(|child| {
                 child.ids.parent == viewport_id
                     && child.ids.this != viewport_id
                     && child.viewport_ui_cb.is_none()
                     && is_viewport_or_descendant_visible(&glutin.viewports, child.ids.this)
             });
-            let show_ui = is_visible || has_visible_descendant;
+            let show_ui = is_visible || has_visible_descendant || wants_paint;
 
             (raw_input, viewport_ui_cb, is_visible, show_ui)
         };
@@ -1897,6 +1914,7 @@ impl GlutinWindowContext {
             .get_mut(&viewport_id)
             .expect("viewport doesn't exist");
 
+        let new_window = viewport.window.is_none();
         let window = if let Some(window) = &mut viewport.window {
             window
         } else {
@@ -1966,6 +1984,12 @@ impl GlutinWindowContext {
             self.viewport_from_window.remove(&old);
         }
         self.viewport_from_window.insert(window.id(), viewport_id);
+
+        if new_window {
+            // A hidden viewport may need to paint before it becomes visible.
+            // Apply commands queued during creation before its first redraw.
+            viewport.process_commands(&self.egui_ctx, Vec::new());
+        }
 
         Ok(())
     }
