@@ -2,8 +2,8 @@
 //! reactions/mentions/invites, member sidebar, and group management dialogs.
 //! Reused across Community, the undocked Friends & Chat window, and the overlay.
 
-use super::community::{Sender, format_time, game_invite_card};
-use client::{Command, State};
+use super::community::{Sender, chat_attachment_menu, format_time, game_invite_card};
+use client::{ChatRecipient, Command, State};
 use egui::{Align, Align2, Color32, CornerRadius, Key, Layout, Margin, Rect, Sense, Stroke, Ui, pos2, vec2};
 use extensions::Action;
 use i18n::t;
@@ -522,10 +522,11 @@ fn message_feed(
                                 .hint_text(w::text(hint, 14.0, t.text_faint))
                                 .font(w::font(14.5))
                                 .frame(egui::Frame::NONE)
-                                .desired_width(ui.available_width() - 48.0),
+                                .desired_width((ui.available_width() - 80.0).max(0.0)),
                         )
                         .with_edit_menu();
                     let send = edit.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
+                    chat_attachment_menu(ui, t, client, ChatRecipient::Group { group_id: g.id, chat_id });
                     let clicked = w::icon_button(ui, t, icons::SEND, t!("Send"), false, 0).clicked();
                     if (send || clicked) && !ui_state.input.trim().is_empty() {
                         let member_names: Vec<(u32, String)> = g

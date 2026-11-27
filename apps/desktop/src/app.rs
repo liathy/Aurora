@@ -654,6 +654,9 @@ impl SteamApp {
                         None => self.toast(now, i18n::t!("Something went wrong"), i18n::tr_dyn(msg)),
                     }
                 }
+                Event::ChatAttachmentFailed(msg) => {
+                    self.toast(now, i18n::t!("Attachment not sent"), i18n::tr_dyn(msg));
+                }
                 Event::KeyActivated(r) => {
                     if let Some(a) = &mut self.activate {
                         a.busy = false;
@@ -1175,7 +1178,7 @@ impl SteamApp {
                 TrayCmd::Friends => self.friends_window.open = true,
                 TrayCmd::Status(s) => self.client.send(Command::SetPersonaState(s)),
                 TrayCmd::Exit => {
-                    if frame.is_window_attached() || self.downloading() {
+                    if self.downloading() {
                         self.show_window(ctx, frame, event.activation_token);
                     }
                     self.request_exit(ctx);
@@ -1290,6 +1293,9 @@ impl eframe::App for SteamApp {
         let mut actions = Vec::new();
         self.drain_events(ctx, &mut actions);
         self.handle_tray(ctx, frame, &mut actions);
+        if self.exiting {
+            return;
+        }
         self.handle_links(ctx, frame, &mut actions);
         if !self.anti_cheat_notices.is_empty() && (self.hidden || ctx.input(|i| i.viewport().minimized == Some(true))) {
             self.show_window(ctx, frame, None);
@@ -1361,6 +1367,9 @@ impl eframe::App for SteamApp {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        if self.exiting && self.hidden {
+            return;
+        }
         // "Limit to 60 fps" (Settings > Accessibility): at most 60 frames a
         // second, even on faster monitors. A frame that comes sooner waits
         // out the rest of its 1/60 s. Idle windows draw nothing, and slower
@@ -1419,6 +1428,9 @@ impl eframe::App for SteamApp {
         self.drain_events(&ctx, &mut actions);
         self.taskbar.update(&self.state.downloads);
         self.handle_tray(&ctx, frame, &mut actions);
+        if self.exiting && self.hidden {
+            return;
+        }
         self.handle_links(&ctx, frame, &mut actions);
 
         // Closing the window hides it in the tray (like Steam) unless "Exit" was chosen.

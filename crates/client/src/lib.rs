@@ -36,6 +36,7 @@ pub mod game_servers;
 mod input_config;
 pub mod account;
 pub mod chat_groups;
+mod chat_attachments;
 mod notify;
 mod pads;
 
@@ -80,6 +81,19 @@ use model::{
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ChatRecipient {
+    Friend(SteamId),
+    Group { group_id: GroupChatId, chat_id: ChatRoomId },
+}
+
+#[derive(Clone, Debug)]
+pub enum ChatAttachment {
+    Image(PathBuf),
+    LastScreenshot,
+    TradeOfferUrl,
+}
 
 #[derive(Clone)]
 pub enum Command {
@@ -129,6 +143,7 @@ pub enum Command {
     /// Start a game that isn't running with `connect` as its arguments instead.
     JoinRunningGame { app_id: AppId, friend: SteamId, connect: String },
     SendMessage { to: SteamId, text: String },
+    SendChatAttachment { recipient: ChatRecipient, attachment: ChatAttachment },
     /// Invite a friend into the running game's lobby: lets them in (private
     /// lobbies) and sends a game invite that joins it.
     InviteToLobby { app_id: AppId, lobby: u64, friend: SteamId },
@@ -389,6 +404,7 @@ impl std::fmt::Debug for Command {
             Command::AttachGame { app_id, install_dir } => f.debug_struct("AttachGame").field("app_id", app_id).field("install_dir", install_dir).finish(),
             Command::JoinRunningGame { app_id, friend, connect } => f.debug_struct("JoinRunningGame").field("app_id", app_id).field("friend", friend).field("connect", connect).finish(),
             Command::SendMessage { to, text } => f.debug_struct("SendMessage").field("to", to).field("text", text).finish(),
+            Command::SendChatAttachment { recipient, .. } => f.debug_struct("SendChatAttachment").field("recipient", recipient).finish_non_exhaustive(),
             Command::InviteToLobby { app_id, lobby, friend } => f.debug_struct("InviteToLobby").field("app_id", app_id).field("lobby", lobby).field("friend", friend).finish(),
             Command::AddFriend { steam_id } => f.debug_struct("AddFriend").field("steam_id", steam_id).finish(),
             Command::RemoveFriend { steam_id } => f.debug_struct("RemoveFriend").field("steam_id", steam_id).finish(),
@@ -539,6 +555,7 @@ impl std::fmt::Debug for Command {
 
 #[derive(Debug, Clone)]
 pub enum Event {
+    ChatAttachmentFailed(String),
     Connecting,
     /// Show this URL as a QR code (it may be replaced by a newer one).
     QrChallenge { url: String },

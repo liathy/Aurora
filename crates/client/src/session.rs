@@ -1161,6 +1161,7 @@ async fn online(
                 }
                 Some(Command::ForgetAccount { account }) => store::remove(&account),
                 Some(Command::SendMessage { to, text }) => st.send_message(to, text, sink),
+                Some(Command::SendChatAttachment { recipient, attachment }) => st.send_chat_attachment(recipient, attachment, sink),
                 Some(Command::LoadChatGroups) => crate::chat_groups::load_my_groups(st.conn.clone(), st.me, st.active_groups.clone(), sink.clone()),
                 Some(Command::OpenChatGroup { group_id }) => crate::chat_groups::load_group_state(st.conn.clone(), st.me, group_id, st.active_groups.clone(), sink.clone()),
                 Some(Command::LoadGroupHistory { group_id, chat_id, before }) => crate::chat_groups::load_history(st.conn.clone(), st.me, group_id, chat_id, before, sink.clone()),
@@ -2280,35 +2281,72 @@ impl Online {
 
     fn send_message(&self, to: SteamId, text: String, sink: &Sink) {
         let (conn, sink, me) = (self.conn.clone(), sink.clone(), self.me);
-        tokio::spawn(async move {
-            let r: Result<CFriendMessagesSendMessageResponse, _> = conn
-                .call(
-                    "FriendMessages.SendMessage#1",
-                    &CFriendMessagesSendMessageRequest {
-                        steamid: Some(to),
-                        chat_entry_type: Some(1),
-                        message: Some(text.clone()),
-                        contains_bbcode: Some(false),
-                        ..Default::default()
+        tokio::spawn(Self::send_direct_message(conn, sink, me, to, text));
+    }
+
+    fn send_chat_attachment(&self, recipient: crate::ChatRecipient, attachment: crate::ChatAttachment, sink: &Sink) {
+        use crate::{ChatAttachment, ChatRecipient};
+        if self.link != Link::Online {
+            sink(Event::ChatAttachmentFailed("Steam is offline.".into()));
+            return;
+        }
+        let (conn, me) = (self.conn.clone(), self.me);
+        if matches!(&attachment, ChatAttachment::TradeOfferUrl) {
+            let sink = sink.clone();
+            tokio::spawn(async move {
+                match crate::chat_attachments::trade_offer_url(&conn, me).await {
+                    Ok(text) => match recipient {
+                        ChatRecipient::Friend(to) => Self::send_direct_message(conn, sink, me, to, text).await,
+                        ChatRecipient::Group { group_id, chat_id } => crate::chat_groups::send_message(conn, me, group_id, chat_id, text, sink),
                     },
-                )
-                .await;
-            match r {
-                Ok(r) => {
-                    let parsed = model::chat::parse_message(if r.modified_message().is_empty() { &text } else { r.modified_message() });
-                    sink(Event::Message(model::ChatMessage {
-                        friend: to,
-                        from: me,
-                        text: parsed.text,
-                        time: r.server_timestamp() as u64,
-                        invite: parsed.invite,
-                        group_invite: parsed.group_invite,
-                        media: parsed.media,
-                    }))
+                    Err(e) => sink(Event::ChatAttachmentFailed(format!("Couldn't get the trade offer URL: {e}"))),
                 }
-                Err(e) => sink(Event::Error(format!("Message not sent: {e}"))),
+            });
+            return;
+        }
+        let root = self.steam_root.clone();
+        self.with_web(sink, move |web, sink| async move {
+            let result = async {
+                let web = web?;
+                let image = tokio::task::spawn_blocking(move || crate::chat_attachments::read_image(attachment, root.as_deref(), me))
+                    .await
+                    .map_err(|e| e.to_string())??;
+                crate::chat_attachments::upload(&web, recipient, image).await
+            }.await;
+            if let Err(e) = result {
+                sink(Event::ChatAttachmentFailed(e));
             }
         });
+    }
+
+    async fn send_direct_message(conn: Connection, sink: Sink, me: SteamId, to: SteamId, text: String) {
+        let r: Result<CFriendMessagesSendMessageResponse, _> = conn
+            .call(
+                "FriendMessages.SendMessage#1",
+                &CFriendMessagesSendMessageRequest {
+                    steamid: Some(to),
+                    chat_entry_type: Some(1),
+                    message: Some(text.clone()),
+                    contains_bbcode: Some(false),
+                    ..Default::default()
+                },
+            )
+            .await;
+        match r {
+            Ok(r) => {
+                let parsed = model::chat::parse_message(if r.modified_message().is_empty() { &text } else { r.modified_message() });
+                sink(Event::Message(model::ChatMessage {
+                    friend: to,
+                    from: me,
+                    text: parsed.text,
+                    time: r.server_timestamp() as u64,
+                    invite: parsed.invite,
+                    group_invite: parsed.group_invite,
+                    media: parsed.media,
+                }))
+            }
+            Err(e) => sink(Event::Error(format!("Message not sent: {e}"))),
+        }
     }
 
     fn with_progress(&self, app_id: AppId, f: impl FnOnce(&depot::Progress)) {

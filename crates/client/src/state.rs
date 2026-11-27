@@ -742,6 +742,7 @@ impl State {
             Event::LoggedOut { reason } => {
                 *self = State { last_error: Some(reason.clone()), ..Default::default() };
             }
+            Event::ChatAttachmentFailed(_) => {}
             Event::Error(msg) => {
                 if self.playing.is_none() {
                     self.launching = None;

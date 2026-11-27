@@ -1309,7 +1309,7 @@ fn steam_pages_tabs(app: &mut SteamApp, ui: &mut Ui, t: &Theme, actions: &mut Ve
                 });
             });
             ui.horizontal(|ui| {
-                ui.label(w::text(icons::LINK, 15.0, ui.visuals().hyperlink_color));
+                ui.label(w::text(icons::LINK, 15.0, t.link_color()));
                 let submit = ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     let open = w::button(ui, t, None, t!("Open"), w::Kind::Secondary, w::Size::Sm).clicked();
                     let input = ui.add(egui::TextEdit::singleline(&mut app.overlay.steam_link)

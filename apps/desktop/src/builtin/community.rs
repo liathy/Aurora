@@ -3,7 +3,7 @@
 use super::group_chat::{self, ChatTarget, GroupUiState};
 use ui::widgets::EditMenu;
 use i18n::t;
-use client::{Client, Command, Event, State};
+use client::{ChatAttachment, ChatRecipient, Client, Command, Event, State};
 use egui::{Align, Align2, CornerRadius, Key, Layout, Margin, Rect, Sense, Stroke, Ui, pos2, vec2};
 use extensions::{Action, Ctx, Extension, Manifest, PageSpec};
 use model::{GroupChatId, PersonaState, SteamId, art};
@@ -250,6 +250,58 @@ impl Sender for Client {
     }
 }
 
+pub(super) fn chat_attachment_menu(ui: &mut Ui, t: &Theme, client: &impl Sender, recipient: ChatRecipient) {
+    let draft_id = ui.scope_id().with(("chat-attachment", recipient));
+    let button = w::icon_button(ui, t, icons::PAPERCLIP, t!("Attachments"), false, 0);
+    let selection = egui::Popup::menu(&button).show(|ui| {
+        if w::button(ui, t, Some(icons::IMAGE), t!("Upload an image"), w::Kind::Ghost, w::Size::Sm).clicked() {
+            ui.close();
+            return rfd::FileDialog::new()
+                .add_filter(t!("Images").to_string(), &["png", "jpg", "jpeg", "gif", "webp"])
+                .pick_file()
+                .map(ChatAttachment::Image);
+        }
+        if w::button(ui, t, Some(icons::CAMERA), t!("Upload last screenshot"), w::Kind::Ghost, w::Size::Sm).clicked() {
+            ui.close();
+            return Some(ChatAttachment::LastScreenshot);
+        }
+        if w::button(ui, t, Some(icons::LINK), t!("Share your trade offer URL"), w::Kind::Ghost, w::Size::Sm).clicked() {
+            ui.close();
+            return Some(ChatAttachment::TradeOfferUrl);
+        }
+        None
+    });
+    if let Some(attachment) = selection.and_then(|r| r.inner) {
+        ui.data_mut(|d| d.insert_temp(draft_id, attachment));
+    }
+    let Some(attachment) = ui.data(|d| d.get_temp::<ChatAttachment>(draft_id)) else { return };
+    let description = match &attachment {
+        ChatAttachment::Image(path) => {
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
+            t!("Send {name} to this chat?", name = name)
+        }
+        ChatAttachment::LastScreenshot => t!("Send your most recent local Steam or Aurora screenshot to this chat?").to_string(),
+        ChatAttachment::TradeOfferUrl => t!("Share your Steam trade offer URL with this chat?").to_string(),
+    };
+    let mut send = false;
+    let mut cancel = false;
+    let modal = w::modal(ui.ctx(), draft_id).show(ui.ctx(), |ui| {
+        ui.set_max_width(340.0);
+        ui.label(w::text_bold(t!("Send attachment"), 18.0, t.text));
+        ui.label(w::text(description, 13.0, t.text_dim));
+        ui.horizontal(|ui| {
+            send = w::button(ui, t, Some(icons::SEND), t!("Send"), w::Kind::Primary, w::Size::Sm).clicked();
+            cancel = w::button(ui, t, None, t!("Cancel"), w::Kind::Ghost, w::Size::Sm).clicked();
+        });
+    });
+    if send {
+        client.send(Command::SendChatAttachment { recipient, attachment });
+    }
+    if send || cancel || modal.should_close() {
+        ui.data_mut(|d| d.remove::<ChatAttachment>(draft_id));
+    }
+}
+
 /// Message list plus composer. Used by Community, the Friends window and
 /// the overlay. Returns a game invite the user chose to join.
 pub fn chat_body(ui: &mut Ui, t: &Theme, state: &State, client: &impl Sender, friend: SteamId, input: &mut String, height: f32) -> Option<Action> {
@@ -322,12 +374,13 @@ pub fn chat_body(ui: &mut Ui, t: &Theme, state: &State, client: &impl Sender, fr
                         .hint_text(w::text(t!("Message {name}", name = state.persona(friend).name), 14.0, t.text_faint))
                         .font(w::font(14.5))
                         .frame(egui::Frame::NONE)
-                        .desired_width(ui.available_width() - 48.0),
+                        .desired_width((ui.available_width() - 80.0).max(0.0)),
                 ).with_edit_menu();
                 if input.len() > before && before == 0 {
                     client.send(Command::Typing { to: friend });
                 }
                 let send = r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
+                chat_attachment_menu(ui, t, client, ChatRecipient::Friend(friend));
                 let clicked = w::icon_button(ui, t, icons::SEND, t!("Send"), false, 0).clicked();
                 if (send || clicked) && !input.trim().is_empty() {
                     client.send(Command::SendMessage { to: friend, text: input.trim().to_string() });
@@ -425,6 +478,7 @@ fn friend_list(ui: &mut Ui, t: &Theme, state: &State, filter: &str, selected: Op
             }
             let mut c = ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink2(vec2(6.0, 6.0))).layout(Layout::left_to_right(Align::Center)));
             w::avatar(&mut c, t, &art::avatar(p.avatar_hash.as_deref()), 36.0, Some(crate::shell::status_color(t, p)));
+            c.add_space(8.0);
             c.vertical(|ui| {
                 ui.spacing_mut().item_spacing.y = 1.0;
                 ui.add_space(2.0);
