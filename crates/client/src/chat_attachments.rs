@@ -8,12 +8,14 @@ use std::time::Duration;
 use image::{ImageFormat, ImageReader};
 use model::{SteamId, steam_id_to_account};
 use proto::{CEconGetTradeOfferAccessTokenRequest, CEconGetTradeOfferAccessTokenResponse};
-use reqwest::multipart::Form;
-use serde::Deserialize;
+use reqwest::{Response, StatusCode, header, multipart::Form};
+use serde::{Deserialize, Deserializer};
 
 use crate::{ChatAttachment, ChatRecipient, market::Web};
 
 pub(crate) const HOST: &str = "steam-chat.com";
+const ORIGIN: &str = "https://steam-chat.com";
+const CHAT_REFERER: &str = "https://steam-chat.com/chat/";
 const MAX_IMAGE_BYTES: usize = 30 * 1024 * 1024;
 
 pub(crate) struct ChatImage {
@@ -104,6 +106,7 @@ struct Begin {
 
 #[derive(Deserialize)]
 struct UploadTarget {
+    #[serde(deserialize_with = "upload_https")]
     use_https: bool,
     url_host: String,
     url_path: String,
@@ -115,6 +118,22 @@ struct UploadTarget {
 struct UploadHeader {
     name: String,
     value: String,
+}
+
+fn upload_https<'de, D: Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Flag {
+        Bool(bool),
+        Number(u8),
+    }
+
+    match Flag::deserialize(deserializer)? {
+        Flag::Bool(flag) => Ok(flag),
+        Flag::Number(0) => Ok(false),
+        Flag::Number(1) => Ok(true),
+        Flag::Number(_) => Err(serde::de::Error::custom("invalid Steam HTTPS flag")),
+    }
 }
 
 fn decimal(value: &serde_json::Value) -> Result<String, String> {
@@ -134,9 +153,11 @@ pub(crate) async fn upload(
     mut image: ChatImage,
 ) -> Result<(), String> {
     let size = image.bytes.len();
-    let begin: Begin = web
+    let response = web
         .http
-        .post(format!("https://{HOST}/chat/beginfileupload/"))
+        .post(format!("{ORIGIN}/chat/beginfileupload/"))
+        .header(header::ORIGIN, ORIGIN)
+        .header(header::REFERER, CHAT_REFERER)
         .query(&[("l", "english")])
         .multipart(
             image
@@ -145,12 +166,8 @@ pub(crate) async fn upload(
         )
         .send()
         .await
-        .map_err(|_| "Couldn't contact Steam Chat.")?
-        .error_for_status()
-        .map_err(|e| format!("Steam Chat couldn't start the upload ({e})."))?
-        .json()
-        .await
-        .map_err(|_| "Steam Chat didn't return upload details.")?;
+        .map_err(|_| "Couldn't contact Steam Chat.")?;
+    let begin = begin_details(response).await?;
 
     let ugcid = decimal(&begin.result.ugcid)?;
     let timestamp = decimal(&begin.timestamp)?;
@@ -170,7 +187,9 @@ pub(crate) async fn upload(
     };
     let response = web
         .http
-        .post(format!("https://{HOST}/chat/commitfileupload/"))
+        .post(format!("{ORIGIN}/chat/commitfileupload/"))
+        .header(header::ORIGIN, ORIGIN)
+        .header(header::REFERER, CHAT_REFERER)
         .multipart(commit)
         .send()
         .await;
@@ -185,6 +204,22 @@ pub(crate) async fn upload(
         }
     }
     Ok(())
+}
+
+async fn begin_details(response: Response) -> Result<Begin, String> {
+    let status = response.status();
+    if matches!(status, StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN) {
+        return Err(format!(
+            "Steam Chat rejected the upload session ({status})."
+        ));
+    }
+    if !status.is_success() {
+        return Err(format!("Steam Chat couldn't start the upload ({status})."));
+    }
+    response
+        .json()
+        .await
+        .map_err(|_| "Steam Chat returned an invalid upload response.".into())
 }
 
 async fn put_image(target: &UploadTarget, bytes: Vec<u8>) -> Result<(), String> {
@@ -255,6 +290,27 @@ mod tests {
             "18446744073709551615"
         );
         assert!(decimal(&serde_json::json!(1.5)).is_err());
+    }
+
+    #[test]
+    fn accepts_boolean_and_numeric_upload_https_flags() {
+        for flag in [serde_json::json!(true), serde_json::json!(1)] {
+            let begin: Begin = serde_json::from_value(serde_json::json!({
+                "result": {
+                    "use_https": flag,
+                    "url_host": "storage.example",
+                    "url_path": "/image",
+                    "ugcid": "18446744073709551615",
+                    "request_headers": [{"name": "content-type", "value": "image/png"}]
+                },
+                "timestamp": 123,
+                "hmac": "signature"
+            }))
+            .unwrap();
+
+            assert!(begin.result.use_https);
+            assert_eq!(decimal(&begin.result.ugcid).unwrap(), u64::MAX.to_string());
+        }
     }
 
     #[test]

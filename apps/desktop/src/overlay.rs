@@ -1054,7 +1054,6 @@ pub fn show(app: &mut SteamApp, ctx: &egui::Context, actions: &mut Vec<Action>) 
 /// The overlay itself: the dimmed game, the top bar and the windows. Shared
 /// by the window overlay and the in-game one. Returns true to close.
 fn content(app: &mut SteamApp, ui: &mut Ui, t: &Theme, actions: &mut Vec<Action>, active: bool) -> bool {
-    let close = active && ui.input(|i| i.key_pressed(Key::Escape) || (i.modifiers.shift && i.key_pressed(Key::Tab)) || i.viewport().close_requested());
     let first_action = actions.len();
     // Dim the game, like Steam does (nothing but pinned windows when closed).
     let fill = if active { Color32::from_black_alpha(150) } else { Color32::TRANSPARENT };
@@ -1104,7 +1103,8 @@ fn content(app: &mut SteamApp, ui: &mut Ui, t: &Theme, actions: &mut Vec<Action>
     app.route_overlay_actions(routed, actions);
     // The clock and session time.
     ctx.request_repaint_after(std::time::Duration::from_secs(1));
-    close
+    // Give dialogs the first opportunity to consume Escape.
+    active && ui.input(|i| i.key_pressed(Key::Escape) || (i.modifiers.shift && i.key_pressed(Key::Tab)) || i.viewport().close_requested())
 }
 
 /// Local time as HH:MM.
@@ -1757,7 +1757,7 @@ fn chat_window(app: &mut SteamApp, ctx: &egui::Context, t: &Theme, actions: &mut
                 ui.add_space(6.0);
                 // Exactly the space the window has, so it never grows by itself.
                 let h = ui.available_height();
-                actions.extend(crate::builtin::community::chat_body(ui, t, &app.state, &app.client, id, &mut app.overlay.input, h));
+                actions.extend(crate::builtin::community::chat_body(ui, t, &app.state, &app.client, id, &mut app.overlay.input, h, true));
             });
         }
         crate::builtin::group_chat::ChatTarget::Group(gid) => {
